@@ -5,6 +5,9 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const busRoutes = require("./routes/busRoutes");
+const locationRoutes = require("./routes/locationRoutes");
+
 
 dotenv.config();
 
@@ -30,6 +33,10 @@ app.post("/test", (req, res) => {
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/buses", busRoutes);
+app.use("/api/location", locationRoutes);
+
+
 
 // Test Route
 app.get("/", (req, res) => {
