@@ -28,6 +28,12 @@ const busSchema = new mongoose.Schema(
       type: String,
       default: "active",
     },
+    currentLocation: {
+  latitude: Number,
+  longitude: Number,
+  updatedAt: Date,
+},
+
   },
   { timestamps: true }
 );

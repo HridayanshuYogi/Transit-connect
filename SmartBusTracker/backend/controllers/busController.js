@@ -1,6 +1,6 @@
 const Bus = require("../models/Bus");
 const User = require("../models/User");
-
+const { getDistance } = require("../utils/distance");
 
 // ================= ADD BUS =================
 exports.addBus = async (req, res) => {
@@ -94,6 +94,88 @@ exports.assignDriver = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: error.message,
+    });
+  }
+};
+// ============ UPDATE BUS LOCATION (Driver) ============
+exports.updateLocation = async (req, res) => {
+  try {
+    const { busId, latitude, longitude } = req.body;
+
+    if (!busId || !latitude || !longitude) {
+      return res.status(400).json({
+        message: "All fields required",
+      });
+    }
+
+    const bus = await Bus.findById(busId);
+
+    if (!bus) {
+      return res.status(404).json({
+        message: "Bus not found",
+      });
+    }
+
+    bus.currentLocation = {
+      latitude,
+      longitude,
+      updatedAt: new Date(),
+    };
+
+    await bus.save();
+
+    res.json({
+      message: "Location updated ✅",
+      location: bus.currentLocation,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      message: "Server Error",
+    });
+  }
+};
+// ============ GET ETA ============
+exports.getETA = async (req, res) => {
+  try {
+    const { busId, destLat, destLng } = req.query;
+
+    if (!busId || !destLat || !destLng) {
+      return res.status(400).json({
+        message: "Missing parameters",
+      });
+    }
+
+    const bus = await Bus.findById(busId);
+
+    if (!bus || !bus.currentLocation) {
+      return res.status(404).json({
+        message: "Bus location not available",
+      });
+    }
+
+    const { latitude, longitude } = bus.currentLocation;
+
+    const distance = getDistance(
+      latitude,
+      longitude,
+      Number(destLat),
+      Number(destLng)
+    );
+
+    // Assume avg speed = 40 km/h
+    const etaHours = distance / 40;
+    const etaMinutes = Math.round(etaHours * 60);
+
+    res.json({
+      distance: distance.toFixed(2) + " km",
+      eta: etaMinutes + " minutes",
+    });
+
+  } catch (error) {
+    console.log("ETA ERROR ", error);
+    res.status(500).json({
+      message: "Server Error",
     });
   }
 };

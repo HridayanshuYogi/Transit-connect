@@ -5,6 +5,7 @@ const {
   addBus,
   getAllBuses,
   assignDriver,
+  updateLocation,getETA
 } = require("../controllers/busController");
 
 const { protect, authorize } = require("../middleware/authMiddleware");
@@ -20,6 +21,17 @@ router.put("/assign-driver", protect, authorize("admin"), assignDriver);
 
 // Public → Get Buses
 router.get("/", getAllBuses);
+// Passenger → Get ETA
+router.get("/eta", getETA);
+
+// Driver → Update Location
+router.post(
+  "/location",
+  protect,
+  authorize("driver"),
+  updateLocation
+);
+
 
 
 module.exports = router;
