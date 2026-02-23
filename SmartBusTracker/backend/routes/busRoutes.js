@@ -5,7 +5,13 @@ const {
   addBus,
   getAllBuses,
   assignDriver,
-  updateLocation,getETA
+  updateLocation,
+  getETA,
+  getStopETAs,
+  getLiveLocation,
+  getLiveBuses,
+  updateBusStatus,
+  updatePassengerLoad
 } = require("../controllers/busController");
 
 const { protect, authorize } = require("../middleware/authMiddleware");
@@ -31,6 +37,10 @@ router.post(
   authorize("driver"),
   updateLocation
 );
+
+router.put("/live/:id", updateLocation);
+router.get("/live", getLiveBuses);
+router.get("/stops/:busId", getStopETAs);
 
 
 

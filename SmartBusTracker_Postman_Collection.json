@@ -1,0 +1,398 @@
+{
+  "info": {
+    "name": "SmartBusTracker API",
+    "description": "Complete API collection for SmartBusTracker - Real-time bus tracking system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5001/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has token', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody).to.have.property('token');",
+                  "  pm.environment.set('token', responseBody.token);",
+                  "});",
+                  "",
+                  "pm.test('User object is returned', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody.user).to.have.property('id');",
+                  "  pm.expect(responseBody.user).to.have.property('phone');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"name\\\": \\\"John Doe\\\",\\n  \\\"phone\\\": \\\"9876543210\\\",\\n  \\\"password\\\": \\\"password123\\\",\\n  \\\"role\\\": \\\"passenger\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has token', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody).to.have.property('token');",
+                  "  pm.environment.set('token', responseBody.token);",
+                  "});",
+                  "",
+                  "pm.test('Login message is correct', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody.message).to.equal('Login successful');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"phone\\\": \\\"9876543210\\\",\\n  \\\"password\\\": \\\"password123\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ensure token is set",
+                  "if (!pm.environment.get('token')) {",
+                  "  console.warn('Warning: No token found. Please run Login first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user data', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody).to.have.property('user');",
+                  "  pm.expect(responseBody.user).to.have.property('phone');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/users/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "profile"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Buses",
+      "item": [
+        {
+          "name": "Get All Buses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "  const responseBody = pm.response.json();",
+                  "  pm.expect(responseBody).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buses"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Bus (Admin Only)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 403', function () {",
+                  "  pm.expect([201, 403]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"busNumber\\\": \\\"BUS-001\\\",\\n  \\\"route\\\": \\\"Route A\\\",\\n  \\\"capacity\\\": 50,\\n  \\\"currentPassengers\\\": 0\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/buses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buses"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Bus ETA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 400', function () {",
+                  "  pm.expect([200, 400]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/buses/eta?busId=<bus_id>&latitude=28.6139&longitude=77.2090",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "buses",
+                "eta"
+              ],
+              "query": [
+                {
+                  "key": "busId",
+                  "value": "<bus_id>"
+                },
+                {
+                  "key": "latitude",
+                  "value": "28.6139"
+                },
+                {
+                  "key": "longitude",
+                  "value": "77.2090"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Locations",
+      "item": [
+        {
+          "name": "Update Bus Location",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 401', function () {",
+                  "  pm.expect([200, 401]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\\n  \\\"busId\\\": \\\"<bus_id>\\\",\\n  \\\"latitude\\\": 28.6139,\\n  \\\"longitude\\\": 77.2090,\\n  \\\"timestamp\\\": \\\"2026-02-19T10:30:00Z\\\"\\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/location",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "location"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Server Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Server is running', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response message correct', function () {",
+                  "  pm.response.text().to.include('SmartBusTracker');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5001/",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "5001",
+              "path": [
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

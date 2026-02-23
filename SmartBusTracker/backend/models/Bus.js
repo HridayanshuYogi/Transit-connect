@@ -1,41 +1,33 @@
 const mongoose = require("mongoose");
 
-const busSchema = new mongoose.Schema(
-  {
-    busNumber: {
-      type: String,
-      required: true,
-      unique: true,
-    },
+const busSchema = new mongoose.Schema({
+  busName: String,
+  from: String,
+  to: String,
+  price: Number,
 
-    routeFrom: {
-      type: String,
-      required: true,
-    },
-
-    routeTo: {
-      type: String,
-      required: true,
-    },
-
-    driver: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-
-    status: {
-      type: String,
-      default: "active",
-    },
-    currentLocation: {
-  latitude: Number,
-  longitude: Number,
-  updatedAt: Date,
-},
-
+  currentLocation: {
+    latitude: Number,
+    longitude: Number,
   },
-  { timestamps: true }
-);
+
+  speed: {
+    type: Number,
+    default: 40,
+  },
+
+  status: {
+    type: String,
+    default: "On Time",
+  },
+
+  stops: [
+  {
+    name: String,
+    latitude: Number,
+    longitude: Number,
+  }
+],
+});
 
 module.exports = mongoose.model("Bus", busSchema);
