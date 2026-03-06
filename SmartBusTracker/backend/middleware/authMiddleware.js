@@ -6,7 +6,6 @@ exports.protect = async (req, res, next) => {
   try {
     let token;
 
-    // Check Authorization header
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -14,7 +13,6 @@ exports.protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
-    // If no token
     if (!token) {
       return res.status(401).json({
         success: false,
@@ -22,10 +20,8 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Find user from decoded ID
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
@@ -35,7 +31,6 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    // Attach user to request
     req.user = user;
 
     next();
@@ -48,27 +43,6 @@ exports.protect = async (req, res, next) => {
       message: "Token invalid or expired",
     });
   }
-};
-
-// ================= AUTHORIZE ROLES =================
-exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized",
-      });
-    }
-
-    if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: `Role ${req.user.role} not authorized for this action`,
-      });
-    }
-
-    next();
-  };
 };
 
 

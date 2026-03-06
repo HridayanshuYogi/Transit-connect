@@ -1,14 +1,25 @@
 import React, { useEffect, useState, useRef } from "react";
-import { View, StyleSheet, ActivityIndicator, Alert, Text } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Text,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import * as Location from "expo-location";
 
 export default function MapScreen() {
   const [userLocation, setUserLocation] = useState(null);
   const [busLocation, setBusLocation] = useState(null);
+  const [busNumber, setBusNumber] = useState("");
+  const [activeBus, setActiveBus] = useState(null);
+
   const mapRef = useRef(null);
 
-  // 🔥 NEW: Stops Data (Demo)
+  // Demo Stops
   const stops = [
     { id: 1, name: "Stop A", latitude: 28.6139, longitude: 77.2090 },
     { id: 2, name: "Stop B", latitude: 28.6239, longitude: 77.2190 },
@@ -19,9 +30,9 @@ export default function MapScreen() {
     getLocation();
   }, []);
 
-  // Simulated Bus Movement (YOUR ORIGINAL LOGIC)
+  // Simulated Bus Movement
   useEffect(() => {
-    if (!userLocation) return;
+    if (!userLocation || !activeBus) return;
 
     const interval = setInterval(() => {
       setBusLocation((prev) => {
@@ -37,7 +48,6 @@ export default function MapScreen() {
           longitude: prev.longitude + 0.0005,
         };
 
-        // 🔥 NEW: Auto move camera with bus
         mapRef.current?.animateToRegion({
           ...newLocation,
           latitudeDelta: 0.05,
@@ -49,7 +59,7 @@ export default function MapScreen() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [userLocation]);
+  }, [userLocation, activeBus]);
 
   const getLocation = async () => {
     try {
@@ -68,13 +78,16 @@ export default function MapScreen() {
     }
   };
 
-  if (!userLocation) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#1E88FF" />
-      </View>
-    );
-  }
+  const handleBusSearch = () => {
+    if (!busNumber) {
+      Alert.alert("Enter Bus Number");
+      return;
+    }
+
+    setActiveBus(busNumber);
+    setBusLocation(null);
+    Alert.alert("Tracking Bus", `Now tracking Bus No: ${busNumber}`);
+  };
 
   const calculateDistance = () => {
     if (!busLocation) return 0;
@@ -90,7 +103,6 @@ export default function MapScreen() {
     return ((distance / 40) * 60).toFixed(0);
   };
 
-  // 🔥 NEW: Stop ETA + Status
   const getStopStatus = (stop) => {
     if (!busLocation) return "Upcoming";
 
@@ -103,8 +115,51 @@ export default function MapScreen() {
     return "Upcoming";
   };
 
+  const getNextStop = () => {
+    if (!busLocation) return "Calculating...";
+
+    let closest = null;
+    let minDistance = Infinity;
+
+    stops.forEach((stop) => {
+      const dx = stop.latitude - busLocation.latitude;
+      const dy = stop.longitude - busLocation.longitude;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = stop.name;
+      }
+    });
+
+    return closest;
+  };
+
+  if (!userLocation) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#1E88FF" />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
+
+      {/* Bus Search Box */}
+      <View style={styles.searchBox}>
+        <TextInput
+          placeholder="Enter Bus Number"
+          placeholderTextColor="#999"
+          value={busNumber}
+          onChangeText={setBusNumber}
+          style={styles.input}
+        />
+        <TouchableOpacity style={styles.searchBtn} onPress={handleBusSearch}>
+          <Text style={{ color: "#fff" }}>Track</Text>
+        </TouchableOpacity>
+      </View>
+
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -117,23 +172,19 @@ export default function MapScreen() {
         }}
       >
         {/* User Marker */}
-        <Marker
-          coordinate={userLocation}
-          title="You"
-          pinColor="blue"
-        />
+        <Marker coordinate={userLocation} title="You" pinColor="blue" />
 
         {/* Bus Marker */}
         {busLocation && (
           <Marker
             coordinate={busLocation}
-            title="Live Bus"
+            title={activeBus ? `Bus ${activeBus}` : "Live Bus"}
             description="Smart Express"
             pinColor="red"
           />
         )}
 
-        {/* 🔥 NEW: Stop Markers */}
+        {/* Stops */}
         {stops.map((stop) => (
           <Marker
             key={stop.id}
@@ -167,16 +218,37 @@ export default function MapScreen() {
       {busLocation && (
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
+            Bus: {activeBus}
+          </Text>
+          <Text style={styles.infoText}>
             Distance: {calculateDistance()} km
           </Text>
           <Text style={styles.infoText}>
             ETA: {eta()} mins
           </Text>
           <Text style={styles.infoText}>
+            Next Stop: {getNextStop()}
+          </Text>
+          <Text style={styles.infoText}>
             Status: On Time ✅
           </Text>
         </View>
       )}
+
+      {/* My Location Button */}
+      <TouchableOpacity
+        style={styles.zoomBtn}
+        onPress={() =>
+          mapRef.current?.animateToRegion({
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          })
+        }
+      >
+        <Text style={{ color: "#fff" }}>My Location</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -189,6 +261,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  searchBox: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    zIndex: 10,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: "#fff",
+    padding: 10,
+    borderRadius: 10,
+  },
+  searchBtn: {
+    marginLeft: 10,
+    backgroundColor: "#1E88FF",
+    paddingHorizontal: 15,
+    justifyContent: "center",
+    borderRadius: 10,
   },
   infoBox: {
     position: "absolute",
@@ -203,5 +296,13 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     marginBottom: 5,
+  },
+  zoomBtn: {
+    position: "absolute",
+    bottom: 130,
+    right: 20,
+    backgroundColor: "#1E88FF",
+    padding: 10,
+    borderRadius: 10,
   },
 });

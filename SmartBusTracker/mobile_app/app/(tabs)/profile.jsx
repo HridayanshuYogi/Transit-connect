@@ -30,8 +30,13 @@ export default function ProfileScreen() {
       const token = await AsyncStorage.getItem("token");
 
       const response = await fetch(
-        "http://192.168.1.34:5002/api/users/profile",
+        // "http://10.0.2.2:5002/api/users/profile",
+        "http://10.0.2.2:5002/api/users/profile",
         {
+
+      // const response = await fetch(
+      //   "http://10.0.2.2:5002/api/users/profile",
+      //   {
           headers: {
             Authorization: `Bearer ${token}`,
           },

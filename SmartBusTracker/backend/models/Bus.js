@@ -6,6 +6,13 @@ const busSchema = new mongoose.Schema({
   to: String,
   price: Number,
 
+  status: {
+    type: String,
+    enum: ["reserved", "booked"],
+    default: "reserved",
+  },
+  reservedUntil: Date,
+
   currentLocation: {
     latitude: Number,
     longitude: Number,

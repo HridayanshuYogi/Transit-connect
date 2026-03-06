@@ -52,6 +52,13 @@ exports.loginUser = async (req, res) => {
   try {
     const { phone, password } = req.body;
 
+    if (!phone || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
     const user = await User.findOne({ phone });
 
     if (!user) {

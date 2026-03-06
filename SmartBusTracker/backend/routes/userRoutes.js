@@ -24,6 +24,31 @@ router.get("/profile", protect, (req, res) => {
     message: "Access granted ✅",
     user: req.user,
   });
+
+app.post("/reserve-seat", async (req, res) => {
+  const { busName, seatNumber } = req.body;
+
+  const expireTime = new Date(Date.now() + 5 * 60 * 1000);
+
+  const ticket = await Ticket.create({
+    busName,
+    seatNumber,
+    status: "reserved",
+    reservedUntil: expireTime,
+  });
+
+  res.json(ticket);
+});
+router.get("/verify/:id", async (req, res) => {
+  const ticket = await Ticket.findById(req.params.id);
+
+  if (!ticket) {
+    return res.json({ valid: false });
+  }
+
+  res.json({ valid: true });
+});
+
 });
 
 module.exports = router;

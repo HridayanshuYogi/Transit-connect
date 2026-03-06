@@ -29,7 +29,8 @@ export default function RegisterScreen() {
 
   const [role, setRole] = useState("passenger");   // ✅ ADD HERE
   const [showDatePicker, setShowDatePicker] = useState(false); 
-
+  const [reservationTime, setReservationTime] = useState(null);
+  const [timer, setTimer] = useState(0);
   // -------- REGISTER FUNCTION --------
   const handleRegister = async () => {
     if (!phone || !fullName || !email || !password) {
@@ -38,7 +39,10 @@ export default function RegisterScreen() {
     }
 
     try {
-      const API_URL = "http://192.168.1.34:5002/api/auth/register";
+      // const API_URL = "http://10.0.2.2:5002/api/auth/register";
+
+      const API_URL = "http://10.0.2.2:5002/api/auth/register";
+    
 
       const response = await fetch(API_URL, {
         method: "POST",

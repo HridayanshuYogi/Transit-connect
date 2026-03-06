@@ -29,7 +29,9 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      const API_URL = "http://192.168.1.34:5002/api/auth/login";
+      // const API_URL = "http://10.0.2.2:5002/api/auth/login";
+
+      const API_URL = "http://10.0.2.2:5002/api/auth/login";
 
       const response = await fetch(API_URL, {
         method: "POST",

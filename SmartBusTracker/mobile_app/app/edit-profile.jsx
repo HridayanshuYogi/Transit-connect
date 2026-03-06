@@ -26,8 +26,12 @@ export default function EditProfile() {
   const loadProfile = async () => {
     const token = await AsyncStorage.getItem("token");
 
+    // const res = await fetch(
+    //   "http://10.0.2.2:5002/api/users/profile",
+    //   {
+
     const res = await fetch(
-      "http://192.168.1.34:5002/api/users/profile",
+      "http://10.0.2.2:5002/api/users/profile",
       {
         headers: { Authorization: `Bearer ${token}` },
       }
@@ -53,8 +57,12 @@ export default function EditProfile() {
   const handleUpdate = async () => {
     const token = await AsyncStorage.getItem("token");
 
+    // const res = await fetch(
+    //   "http://10.0.2.2:5002/api/users/profile",
+    //   {
+
     const res = await fetch(
-      "http://192.168.1.34:5002/api/users/profile",
+      "http://10.0.2.2:5002/api/users/profile",
       {
         method: "PUT",
         headers: {
