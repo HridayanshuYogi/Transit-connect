@@ -8,10 +8,15 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+
 import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import io from "socket.io-client";
+
+const socket = io("http://10.0.2.2:5002");
 
 export default function BookScreen() {
+
   const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeat, setSelectedSeat] = useState(null);
@@ -32,6 +37,31 @@ export default function BookScreen() {
     fetchBuses();
   }, []);
 
+  // 🔥 LIVE SEAT UPDATE
+  useEffect(() => {
+
+    socket.on("seatUpdated", (data) => {
+
+      if (filteredBuses.length === 0) return;
+
+      if (data.busName === filteredBuses[0]?.busName) {
+
+        setBookedSeats((prev) => {
+
+          if (prev.includes(data.seatNumber)) return prev;
+
+          return [...prev, data.seatNumber];
+        });
+      }
+
+    });
+
+    return () => {
+      socket.off("seatUpdated");
+    };
+
+  }, [filteredBuses]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (from && to) {
@@ -42,11 +72,13 @@ export default function BookScreen() {
     return () => clearInterval(interval);
   }, [from, to]);
 
-  // 🔥 Reservation Countdown Timer
+  // 🔥 Reservation timer
   useEffect(() => {
+
     if (!reservationTime) return;
 
     const interval = setInterval(() => {
+
       const remaining = Math.floor(
         (reservationTime - Date.now()) / 1000
       );
@@ -60,15 +92,18 @@ export default function BookScreen() {
       } else {
         setTimer(remaining);
       }
+
     }, 1000);
 
     return () => clearInterval(interval);
+
   }, [reservationTime]);
 
   const fetchBuses = async () => {
+
     try {
+
       const response = await fetch(
-        // "http://10.0.2.2:5002/api/buses"
         "http://10.0.2.2:5002/api/buses"
       );
 
@@ -78,6 +113,7 @@ export default function BookScreen() {
         setBuses(data);
         setFilteredBuses(data);
       } else {
+
         const demo = [
           {
             _id: "1",
@@ -88,24 +124,34 @@ export default function BookScreen() {
             bookedSeats: ["A1", "A3"],
           },
         ];
+
         setBuses(demo);
         setFilteredBuses(demo);
       }
+
     } catch (error) {
+
       console.log("FETCH ERROR:", error);
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
   const calculateFare = (basePrice) => {
+
     let extra = 0;
+
     if (seatType === "Window") extra = 20;
     if (seatType === "Aisle") extra = 10;
+
     return basePrice + extra;
   };
 
   const handleSearch = () => {
+
     if (!from || !to) {
       Alert.alert("Select From and To");
       return;
@@ -126,16 +172,17 @@ export default function BookScreen() {
   };
 
   const handleBook = async (bus) => {
+
     if (!selectedSeat) {
       Alert.alert("Select Seat First");
       return;
     }
 
     try {
+
       const token = await AsyncStorage.getItem("token");
 
       const response = await fetch(
-        // "http://10.0.2.2:5002/api/tickets",
         "http://10.0.2.2:5002/api/tickets",
         {
           method: "POST",
@@ -147,10 +194,10 @@ export default function BookScreen() {
             busName: bus.busName,
             from: bus.from,
             to: bus.to,
-            date: new Date(),
             seatNumber: selectedSeat,
             seatType,
             price: calculateFare(bus.price),
+            date: new Date(),
           }),
         }
       );
@@ -162,7 +209,6 @@ export default function BookScreen() {
         return;
       }
 
-      // 🔥 Confirm Seat (change reserved → booked)
       await fetch(
         "http://10.0.2.2:5002/api/tickets/confirm-seat",
         {
@@ -170,9 +216,15 @@ export default function BookScreen() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             seatNumber: selectedSeat,
+            busName: bus.busName,
           }),
         }
       );
+
+      socket.emit("seatBooked", {
+        busName: bus.busName,
+        seatNumber: selectedSeat,
+      });
 
       Alert.alert("Success 🎫", "Seat Booked!");
 
@@ -182,11 +234,16 @@ export default function BookScreen() {
       setTimer(0);
 
     } catch (error) {
-      Alert.alert("Booking Error");
+
+      console.log("BOOK ERROR:", error);
+
+      Alert.alert("Network Error", "Cannot reach server");
+
     }
   };
 
   if (loading) {
+
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#1E88FF" />
@@ -195,10 +252,13 @@ export default function BookScreen() {
   }
 
   return (
+
     <View style={styles.container}>
+
       <Text style={styles.title}>Book Bus 🚌</Text>
 
       <Text style={styles.label}>From</Text>
+
       <View style={styles.pickerBox}>
         <Picker selectedValue={from} onValueChange={setFrom}>
           <Picker.Item label="Select From" value="" />
@@ -208,6 +268,7 @@ export default function BookScreen() {
       </View>
 
       <Text style={styles.label}>To</Text>
+
       <View style={styles.pickerBox}>
         <Picker selectedValue={to} onValueChange={setTo}>
           <Picker.Item label="Select To" value="" />
@@ -229,7 +290,9 @@ export default function BookScreen() {
           </Text>
         }
         renderItem={({ item }) => (
+
           <View style={styles.card}>
+
             <Text style={styles.route}>
               {item.from} → {item.to}
             </Text>
@@ -243,11 +306,15 @@ export default function BookScreen() {
             </Text>
 
             <Text style={styles.section}>Select Seat</Text>
+
             <View style={styles.seatGrid}>
+
               {generateSeats().map((seat) => {
+
                 const isBooked = bookedSeats.includes(seat);
 
                 return (
+
                   <TouchableOpacity
                     key={seat}
                     disabled={isBooked}
@@ -257,9 +324,10 @@ export default function BookScreen() {
                       isBooked && styles.bookedSeat,
                     ]}
                     onPress={async () => {
+
                       try {
+
                         const response = await fetch(
-                          // "http://10.0.2.2:5002/api/tickets/reserve-seat",
                           "http://10.0.2.2:5002/api/tickets/reserve-seat",
                           {
                             method: "POST",
@@ -269,29 +337,37 @@ export default function BookScreen() {
                             body: JSON.stringify({
                               busName: item.busName,
                               seatNumber: seat,
+                              from: item.from,
+                              to: item.to,
                             }),
                           }
                         );
 
+                        const data = await response.json();
+
                         if (!response.ok) {
-                          Alert.alert("Seat Already Reserved");
+                          Alert.alert(data.message || "Seat Already Reserved");
                           return;
                         }
 
                         setSelectedSeat(seat);
-                        setReservationTime(
-                          Date.now() + 5 * 60 * 1000
-                        );
+                        setReservationTime(Date.now() + 5 * 60 * 1000);
                         setTimer(300);
+
                       } catch (error) {
+
                         Alert.alert("Reservation Error");
+
                       }
                     }}
                   >
                     <Text style={{ color: "#fff" }}>{seat}</Text>
                   </TouchableOpacity>
+
                 );
+
               })}
+
             </View>
 
             {selectedSeat && (
@@ -302,8 +378,11 @@ export default function BookScreen() {
             )}
 
             <Text style={styles.section}>Seat Type</Text>
+
             <View style={styles.typeRow}>
+
               {["Window", "Middle", "Aisle"].map((type) => (
+
                 <TouchableOpacity
                   key={type}
                   style={[
@@ -314,7 +393,9 @@ export default function BookScreen() {
                 >
                   <Text style={{ color: "#fff" }}>{type}</Text>
                 </TouchableOpacity>
+
               ))}
+
             </View>
 
             <Text style={styles.fare}>
@@ -327,40 +408,49 @@ export default function BookScreen() {
             >
               <Text style={{ color: "#fff" }}>Confirm Booking</Text>
             </TouchableOpacity>
+
           </View>
+
         )}
       />
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: "#050B1A",
     padding: 20,
     paddingTop: 50,
   },
+
   loader: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#050B1A",
   },
+
   title: {
     color: "#fff",
     fontSize: 22,
     marginBottom: 15,
   },
+
   label: {
     color: "#aaa",
     marginBottom: 5,
   },
+
   pickerBox: {
     backgroundColor: "#111C2F",
     borderRadius: 10,
     marginBottom: 15,
   },
+
   searchBtn: {
     backgroundColor: "#1E88FF",
     padding: 12,
@@ -368,59 +458,72 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
+
   card: {
     backgroundColor: "#111C2F",
     padding: 15,
     borderRadius: 12,
     marginBottom: 15,
   },
+
   route: {
     color: "#fff",
     fontSize: 16,
   },
+
   price: {
     color: "#1E88FF",
     marginVertical: 5,
   },
+
   section: {
     color: "#aaa",
     marginTop: 10,
   },
+
   seatGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
+
   seat: {
     backgroundColor: "#333",
     padding: 10,
     borderRadius: 8,
     margin: 5,
   },
+
   selectedSeat: {
     backgroundColor: "#1E88FF",
   },
+
   bookedSeat: {
     backgroundColor: "red",
     opacity: 0.6,
   },
+
   typeRow: {
     flexDirection: "row",
     marginTop: 8,
   },
+
   typeButton: {
     backgroundColor: "#333",
     padding: 8,
     borderRadius: 8,
     marginRight: 10,
   },
+
   selectedType: {
     backgroundColor: "#1E88FF",
   },
+
   fare: {
     color: "#fff",
     marginTop: 10,
     fontWeight: "bold",
   },
+
   bookBtn: {
     backgroundColor: "#1E88FF",
     padding: 10,
@@ -428,4 +531,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+
 });
