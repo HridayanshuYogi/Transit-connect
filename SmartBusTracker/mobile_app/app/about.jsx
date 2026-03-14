@@ -32,7 +32,7 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 25 },
+  container: { flex: 1, padding: 25, paddingTop: 50 },
   title: {
     fontSize: 26,
     fontWeight: "bold",

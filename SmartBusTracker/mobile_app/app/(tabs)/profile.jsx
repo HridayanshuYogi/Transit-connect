@@ -156,6 +156,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 25,
+    paddingTop: 50,
     justifyContent: "center",
   },
   loader: {

@@ -348,6 +348,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#050B1A",
     padding: 20,
+    paddingTop: 50,
   },
   loader: {
     flex: 1,
