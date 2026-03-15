@@ -16,7 +16,6 @@ export default function ProfileScreen() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Auto refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
@@ -30,13 +29,8 @@ export default function ProfileScreen() {
       const token = await AsyncStorage.getItem("token");
 
       const response = await fetch(
-        // "http://10.0.2.2:5002/api/users/profile",
         "http://10.0.2.2:5002/api/users/profile",
         {
-
-      // const response = await fetch(
-      //   "http://10.0.2.2:5002/api/users/profile",
-      //   {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -79,13 +73,11 @@ export default function ProfileScreen() {
             <ProfileItem label="Phone" value={user.phone} />
             <ProfileItem label="Email" value={user.email || "Not Provided"} />
 
-            {/* ✅ Fixed Gender Display */}
             <ProfileItem
               label="Gender"
               value={user.gender ? user.gender : "Not Set"}
             />
 
-            {/* ✅ Fixed DOB Display */}
             <ProfileItem
               label="Date of Birth"
               value={
@@ -132,6 +124,14 @@ export default function ProfileScreen() {
           <Text style={styles.extraText}>Conductor Panel</Text>
         </TouchableOpacity>
 
+        {/* ADMIN DASHBOARD BUTTON */}
+        <TouchableOpacity
+          style={styles.adminBtn}
+          onPress={() => router.push("/admin_Dashboard")}
+        >
+          <Text style={styles.btnText}>Admin Dashboard</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.logoutBtn}
           onPress={handleLogout}
@@ -153,18 +153,21 @@ function ProfileItem({ label, value }) {
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flexGrow: 1,
     padding: 25,
     paddingTop: 50,
     justifyContent: "center",
   },
+
   loader: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#050B1A",
   },
+
   title: {
     fontSize: 28,
     color: "#1E88FF",
@@ -172,36 +175,29 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     textAlign: "center",
   },
+
   card: {
     backgroundColor: "#111C2F",
     padding: 20,
     borderRadius: 15,
     marginBottom: 30,
   },
+
   item: {
     marginBottom: 15,
   },
+
   label: {
     color: "#888",
     fontSize: 12,
   },
+
   value: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
-  logoutBtn: {
-    backgroundColor: "#1E88FF",
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  logoutText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+
   editBtn: {
     backgroundColor: "#2ecc71",
     padding: 15,
@@ -209,6 +205,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
+
   extraBtn: {
     backgroundColor: "#34495e",
     padding: 15,
@@ -216,8 +213,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
+
   extraText: {
     color: "#fff",
     fontWeight: "bold",
   },
+
+  adminBtn: {
+    backgroundColor: "#9b59b6",
+    padding: 15,
+    borderRadius: 15,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  btnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+
+  logoutBtn: {
+    backgroundColor: "#1E88FF",
+    padding: 15,
+    borderRadius: 15,
+    alignItems: "center",
+    marginTop: 10,
+  },
+
+  logoutText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
 });

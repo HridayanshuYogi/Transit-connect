@@ -319,4 +319,31 @@ router.post("/", async (req, res) => {
   }
 });
 
+
+// =====================================
+// UPDATE LOCATION
+// =====================================
+router.post("/update", async (req, res) => {
+
+  const { busName, latitude, longitude, speed } = req.body;
+
+  const bus = await Bus.findOne({ busName });
+
+  if (!bus) {
+    return res.status(404).json({ message: "Bus not found" });
+  }
+
+  bus.currentLocation = {
+    latitude,
+    longitude
+  };
+
+  bus.speed = speed;
+
+  await bus.save();
+
+  res.json({ message: "Location updated" });
+
+});
+
 module.exports = router;

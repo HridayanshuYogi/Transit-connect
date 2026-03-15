@@ -27,6 +27,7 @@ export default function BookScreen() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [bookedSeats, setBookedSeats] = useState([]);
+  const [eta, setEta] = useState(null);
 
   const TOTAL_SEATS = 12;
 
@@ -140,6 +141,27 @@ export default function BookScreen() {
     }
   };
 
+  const fetchETA = async (busName) => {
+
+    try {
+
+      const res = await fetch(
+        `http://10.0.2.2:5002/api/location/eta/${busName}?lat=28.4595&lng=77.0266`
+      );
+
+      const data = await res.json();
+
+      setEta(data);
+
+    } catch (error) {
+
+      console.log("ETA error:", error);
+
+    }
+
+  };
+
+
   const calculateFare = (basePrice) => {
 
     let extra = 0;
@@ -157,8 +179,9 @@ export default function BookScreen() {
       return;
     }
 
-    const result = buses.filter(
-      (bus) => bus.from === from && bus.to === to
+    const result = buses.filter((bus) =>
+      bus.from?.toLowerCase()===from.toLowerCase() &&
+      bus.to?.toLowerCase()===to.toLowerCase()
     );
 
     setFilteredBuses(result);
@@ -166,10 +189,17 @@ export default function BookScreen() {
 
     if (result.length > 0) {
       setBookedSeats(result[0].bookedSeats || []);
+      fetchETA(result[0].busName);
     } else {
       setBookedSeats([]);
     }
   };
+
+
+
+
+
+  
 
   const handleBook = async (bus) => {
 
@@ -262,7 +292,8 @@ export default function BookScreen() {
       <View style={styles.pickerBox}>
         <Picker selectedValue={from} onValueChange={setFrom}>
           <Picker.Item label="Select From" value="" />
-          <Picker.Item label="Delhi" value="Delhi" />
+          <Picker.Item label="sohna" value="sohna" />
+          <Picker.Item label="gurgoan" value="gurgoan" />
           <Picker.Item label="Jaipur" value="Jaipur" />
         </Picker>
       </View>
@@ -272,7 +303,8 @@ export default function BookScreen() {
       <View style={styles.pickerBox}>
         <Picker selectedValue={to} onValueChange={setTo}>
           <Picker.Item label="Select To" value="" />
-          <Picker.Item label="Delhi" value="Delhi" />
+          <Picker.Item label="sohna" value="sohna" />
+          <Picker.Item label="gurgoan" value="gurgoan" />
           <Picker.Item label="Jaipur" value="Jaipur" />
         </Picker>
       </View>
@@ -293,13 +325,41 @@ export default function BookScreen() {
 
           <View style={styles.card}>
 
+            <View style={styles.busHeader}>
+
             <Text style={styles.route}>
               {item.from} → {item.to}
+            </Text>
+
+            {/* <Text style={styles.seats}>
+             Seats Available: {TOTAL_SEATS - bookedSeats.length}
+            </Text> */}
+
+
+            <Text style={styles.busName}>
+             {item.busName}
             </Text>
 
             <Text style={styles.price}>
               Base Fare: ₹{item.price}
             </Text>
+              </View>
+
+            
+
+             {eta && (
+              <View style={styles.etaCard}>
+
+                <Text style={styles.etaText}>
+                  Distance: {eta.distance} km
+                </Text>
+
+                <Text style={styles.etaText}>
+                  Bus arriving in {eta.eta} minutes
+                </Text>
+
+              </View>
+            )}
 
             <Text style={{ color: "#aaa", marginTop: 5 }}>
               Available Seats: {TOTAL_SEATS - bookedSeats.length}
@@ -307,68 +367,200 @@ export default function BookScreen() {
 
             <Text style={styles.section}>Select Seat</Text>
 
-            <View style={styles.seatGrid}>
+             <View style={styles.busLayout}>
 
-              {generateSeats().map((seat) => {
+  {[
+    ["A1", "A2", "A3", "A4"],
+    ["A5", "A6", "A7", "A8"],
+    ["A9", "A10", "A11", "A12"],
+  ].map((row, rowIndex) => (
 
-                const isBooked = bookedSeats.includes(seat);
+    <View key={rowIndex} style={styles.busRow}>
 
-                return (
+      {/* LEFT SIDE */}
+      <View style={styles.seatSide}>
+        {row.slice(0, 2).map((seat) => {
 
-                  <TouchableOpacity
-                    key={seat}
-                    disabled={isBooked}
-                    style={[
-                      styles.seat,
-                      selectedSeat === seat && styles.selectedSeat,
-                      isBooked && styles.bookedSeat,
-                    ]}
-                    onPress={async () => {
+          const isBooked = bookedSeats.includes(seat);
 
-                      try {
+          return (
+            <TouchableOpacity
+              key={seat}
+              disabled={isBooked}
+              style={[
+                styles.seat,
+                selectedSeat === seat && styles.selectedSeat,
+                isBooked && styles.bookedSeat,
+              ]}
+            //   onPress={async () => {
 
-                        const response = await fetch(
-                          "http://10.0.2.2:5002/api/tickets/reserve-seat",
-                          {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                              busName: item.busName,
-                              seatNumber: seat,
-                              from: item.from,
-                              to: item.to,
-                            }),
-                          }
-                        );
+            //     if (!from || !to) {
+            //       Alert.alert("Select Route", "Please select From and To first");
+            //       return;
+            //     }
+                
+                
 
-                        const data = await response.json();
+            //     try {
 
-                        if (!response.ok) {
-                          Alert.alert(data.message || "Seat Already Reserved");
-                          return;
-                        }
+            //       const response = await fetch(
+            //         "http://10.0.2.2:5002/api/tickets/reserve-seat",
+            //         {
+            //           method: "POST",
+            //           headers: {
+            //             "Content-Type": "application/json",
+            //           },
+            //           body: JSON.stringify({
+            //             busName: item.busName,
+            //             seatNumber: seat,
+            //             from: item.from,
+            //             to: item.to,
+            //           }),
+            //         }
+            //       );
 
-                        setSelectedSeat(seat);
-                        setReservationTime(Date.now() + 5 * 60 * 1000);
-                        setTimer(300);
+            //       const data = await response.json();
 
-                      } catch (error) {
+            //       if (!response.ok) {
+            //         Alert.alert(data.message || "Seat Already Reserved");
+            //         return;
+            //       }
 
-                        Alert.alert("Reservation Error");
+            //       setSelectedSeat(seat);
+            //       setReservationTime(Date.now() + 5 * 60 * 1000);
+            //       setTimer(300);
 
-                      }
-                    }}
-                  >
-                    <Text style={{ color: "#fff" }}>{seat}</Text>
-                  </TouchableOpacity>
+            //     } catch (error) {
+            //       Alert.alert("Reservation Error");
+            //     }
 
-                );
+            //   }}
+            // >
+            //   <Text style={{ color: "#fff" }}>{seat}</Text>
+            // </TouchableOpacity>
+          
 
-              })}
 
-            </View>
+
+
+
+
+
+
+
+            onPress={() => {
+
+  // Check route first
+  if (!from || !to) {
+    Alert.alert("Select Route", "Please select From and To first");
+    return;
+  }
+
+  // Prevent selecting already booked seat
+  if (bookedSeats.includes(seat)) {
+    Alert.alert("Seat already booked");
+    return;
+  }
+
+  // Select seat locally only
+  setSelectedSeat(seat);
+
+  // Start reservation timer UI (optional)
+  setReservationTime(Date.now() + 5 * 60 * 1000);
+  setTimer(300);
+
+}}
+>
+<Text style={{ color: "#fff" }}>{seat}</Text>
+</TouchableOpacity>
+
+
+
+
+
+
+
+
+
+
+          );
+
+        })}
+      </View>
+
+      {/* AISLE */}
+      <View style={styles.aisle} />
+
+      {/* RIGHT SIDE */}
+      <View style={styles.seatSide}>
+        {row.slice(2, 4).map((seat) => {
+
+          const isBooked = bookedSeats.includes(seat);
+
+          return (
+            <TouchableOpacity
+              key={seat}
+              disabled={isBooked}
+              style={[
+                styles.seat,
+                selectedSeat === seat && styles.selectedSeat,
+                isBooked && styles.bookedSeat,
+              ]}
+              onPress={async () => {
+
+                if (!from || !to) {
+                  Alert.alert("Select Route", "Please select From and To first");
+                  return;
+                }
+
+                try {
+
+                  const response = await fetch(
+                    "http://10.0.2.2:5002/api/tickets/reserve-seat",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        busName: item.busName,
+                        seatNumber: seat,
+                        from: item.from,
+                        to: item.to,
+                      }),
+                    }
+                  );
+
+                  const data = await response.json();
+
+                  if (!response.ok) {
+                    Alert.alert(data.message || "Seat Already Reserved");
+                    return;
+                  }
+
+                  setSelectedSeat(seat);
+                  setReservationTime(Date.now() + 5 * 60 * 1000);
+                  setTimer(300);
+
+                } catch (error) {
+                  Alert.alert("Reservation Error");
+                }
+
+              }}
+            >
+              <Text style={{ color: "#fff" }}>{seat}</Text>
+            </TouchableOpacity>
+          );
+          
+
+        })}
+      </View>
+    
+    </View>
+
+  ))}
+
+</View>
 
             {selectedSeat && (
               <Text style={{ color: "orange", marginTop: 5 }}>
@@ -412,9 +604,12 @@ export default function BookScreen() {
           </View>
 
         )}
+        
       />
+      
 
     </View>
+    
   );
 }
 
@@ -475,6 +670,25 @@ const styles = StyleSheet.create({
     color: "#1E88FF",
     marginVertical: 5,
   },
+  etaCard: {
+    backgroundColor: "#111C2F",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+
+  etaText: {
+    color: "#1E88FF",
+    fontWeight: "bold",
+  },
+
+  bookBtn: {
+    backgroundColor: "#1E88FF",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
 
   section: {
     color: "#aaa",
@@ -531,5 +745,66 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10,
   },
+  busLayout: {
+  marginTop: 10,
+},
+
+busRow: {
+  flexDirection: "row",
+  justifyContent: "center",
+  alignItems: "center",
+  marginBottom: 10,
+},
+
+seatSide: {
+  flexDirection: "row",
+},
+
+aisle: {
+  width: 40,
+},
+
+seat: {
+  backgroundColor: "#333",
+  padding: 12,
+  borderRadius: 8,
+  margin: 5,
+  width: 45,
+  alignItems: "center",
+},
+
+selectedSeat: {
+  backgroundColor: "#1E88FF",
+},
+
+bookedSeat: {
+  backgroundColor: "red",
+  opacity: 0.6,
+},
+busHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+},
+
+busName: {
+  color: "#fff",
+  fontSize: 18,
+  fontWeight: "bold",
+},
+
+seats: {
+  color: "#2ecc71",
+  marginTop: 5,
+  fontWeight: "bold",
+},
+
+selectBtn: {
+  backgroundColor: "#1E88FF",
+  padding: 10,
+  borderRadius: 8,
+  marginTop: 10,
+  alignItems: "center",
+},
 
 });

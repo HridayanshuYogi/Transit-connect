@@ -11,7 +11,7 @@ const userRoutes = require("./routes/userRoutes");
 const busRoutes = require("./routes/busRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
-
+const adminRoutes = require("./routes/adminRoutes");
 const Ticket = require("./models/Ticket");
 
 const http = require("http");
@@ -26,6 +26,7 @@ connectDB();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use("/api/admin", adminRoutes);
 
 // Debug Logger
 app.use((req, res, next) => {
