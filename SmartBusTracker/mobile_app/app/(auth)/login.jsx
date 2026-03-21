@@ -6,8 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -22,38 +24,27 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!phone || !password) {
-      Alert.alert("Error ❌", "Enter phone and password");
+      Alert.alert("Error ❌", "Please enter both phone and password");
       return;
     }
 
     try {
       setLoading(true);
-
-      // const API_URL = "http://10.0.2.2:5002/api/auth/login";
-
       const API_URL = "http://10.0.2.2:5002/api/auth/login";
 
       const response = await fetch(API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          phone,
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // ✅ Save token
         await AsyncStorage.setItem("token", data.token);
-
-        // ✅ Navigate to Tabs
         router.replace("/(tabs)");
       } else {
-        Alert.alert("Failed ❌", data.message);
+        Alert.alert("Failed ❌", data.message || "Invalid credentials");
       }
     } catch (error) {
       Alert.alert("Server Error ⚠️", "Backend not reachable!");
@@ -63,97 +54,110 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient colors={["#050B1A", "#000"]} style={styles.container}>
-      <Text style={styles.title}>Login</Text>
+    <LinearGradient colors={["#050B1A", "#050B1A", "#000"]} style={styles.container}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"} 
+        style={styles.innerContainer}
+      >
+        {/* Header Section */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+        </View>
 
-      {/* Phone */}
-      <View style={styles.inputBox}>
-        <Ionicons name="call-outline" size={20} color="#0066ff" />
-        <TextInput
-          placeholder="Phone Number"
-          placeholderTextColor="#555"
-          style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-        />
-      </View>
+        {/* Form Section */}
+        <View style={styles.form}>
+          {/* Phone Input */}
+          <View style={styles.inputBox}>
+            <Ionicons name="call-outline" size={20} color="#1E88FF" />
+            <Text style={styles.countryCode}>+91</Text>
+            <TextInput
+              placeholder="Phone Number"
+              placeholderTextColor="#556789"
+              style={styles.input}
+              keyboardType="phone-pad"
+              value={phone}
+              onChangeText={setPhone}
+            />
+          </View>
 
-      {/* Password */}
-      <View style={styles.inputBox}>
-        <Ionicons name="lock-closed-outline" size={20} color="#0066ff" />
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor="#555"
-          style={styles.input}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-      </View>
+          {/* Password Input */}
+          <View style={styles.inputBox}>
+            <Ionicons name="lock-closed-outline" size={20} color="#1E88FF" />
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor="#556789"
+              style={styles.input}
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
 
-      {/* Login Button */}
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>
-          {loading ? "Logging in..." : "Login"}
-        </Text>
-      </TouchableOpacity>
+          {/* Forgot Password Link */}
+          <TouchableOpacity style={styles.forgotBtn}>
+            <Text style={styles.forgotText}>Forgot Password?</Text>
+          </TouchableOpacity>
 
-      {/* Register Link */}
-      <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-        <Text style={{ color: "#1E88FF", marginTop: 20 }}>
-          New user? Register
-        </Text>
-      </TouchableOpacity>
+          {/* Login Button */}
+          <TouchableOpacity 
+            activeOpacity={0.8} 
+            onPress={handleLogin} 
+            disabled={loading}
+            style={styles.buttonContainer}
+          >
+            <LinearGradient colors={["#1E88FF", "#0052D4"]} style={styles.button}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Login</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Register Link */}
+          <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+            <Text style={styles.footerText}>
+              New user? <Text style={styles.linkText}>Create Account</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </LinearGradient>
   );
 }
 
-/* ---------------- STYLES ---------------- */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
+  container: { flex: 1 },
+  innerContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 25 },
+  
+  header: { alignItems: "center", marginBottom: 40 },
+  title: { fontSize: 36, fontWeight: "bold", color: "#fff", letterSpacing: 1 },
+  subtitle: { fontSize: 15, color: "#556789", marginTop: 5 },
 
-  title: {
-    fontSize: 34,
-    fontWeight: "bold",
-    color: "#1E88FF",
-    marginBottom: 40,
-  },
-
+  form: { width: "100%", maxWidth: 400 },
+  
   inputBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
-    width: "85%",
-    padding: 10,
-    borderRadius: 14,
-    marginBottom: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    height: 65,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
+  input: { flex: 1, marginLeft: 10, fontSize: 16, color: "#fff" },
+  countryCode: { marginLeft: 10, fontSize: 16, fontWeight: "bold", color: "#1E88FF" },
 
-  input: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 16,
-    color: "#000",
-  },
+  forgotBtn: { alignSelf: "flex-end", marginBottom: 25 },
+  forgotText: { color: "#556789", fontSize: 13 },
 
-  button: {
-    backgroundColor: "#0066ff",
-    paddingVertical: 18,
-    width: "85%",
-    borderRadius: 18,
-    alignItems: "center",
-    marginTop: 10,
-  },
+  buttonContainer: { borderRadius: 18, overflow: "hidden", elevation: 5 },
+  button: { paddingVertical: 18, alignItems: "center", justifyContent: "center" },
+  buttonText: { fontSize: 18, fontWeight: "bold", color: "#fff", letterSpacing: 0.5 },
 
-  buttonText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#fff",
-  },
+  footerText: { color: "#556789", textAlign: "center", marginTop: 25, fontSize: 14 },
+  linkText: { color: "#1E88FF", fontWeight: "bold" },
 });

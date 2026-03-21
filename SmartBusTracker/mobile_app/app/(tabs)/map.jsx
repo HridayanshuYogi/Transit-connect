@@ -7,302 +7,213 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
+const { width, height } = Dimensions.get("window");
+
+// Sleek Dark Map Style
+const mapStyle = [
+  { "elementType": "geometry", "stylers": [{ "color": "#242f3e" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#746855" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#242f3e" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#38414e" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#17263c" }] }
+];
 
 export default function MapScreen() {
   const [userLocation, setUserLocation] = useState(null);
   const [busLocation, setBusLocation] = useState(null);
   const [busNumber, setBusNumber] = useState("");
   const [activeBus, setActiveBus] = useState(null);
-
   const mapRef = useRef(null);
 
-  // Demo Stops
   const stops = [
-    { id: 1, name: "Stop A", latitude: 28.6139, longitude: 77.2090 },
-    { id: 2, name: "Stop B", latitude: 28.6239, longitude: 77.2190 },
-    { id: 3, name: "Stop C", latitude: 28.6339, longitude: 77.2290 },
+    { id: 1, name: "Sohna Terminal", latitude: 28.24, longitude: 77.06 },
+    { id: 2, name: "Sector 48 Stop", latitude: 28.41, longitude: 77.04 },
+    { id: 3, name: "Iffco Chowk", latitude: 28.47, longitude: 77.07 },
   ];
 
-  useEffect(() => {
-    getLocation();
-  }, []);
+  useEffect(() => { getLocation(); }, []);
 
-  // Simulated Bus Movement
+  // Simulated Bus Logic
   useEffect(() => {
     if (!userLocation || !activeBus) return;
-
     const interval = setInterval(() => {
       setBusLocation((prev) => {
-        if (!prev) {
-          return {
-            latitude: userLocation.latitude + 0.01,
-            longitude: userLocation.longitude + 0.01,
-          };
-        }
-
-        const newLocation = {
-          latitude: prev.latitude + 0.0005,
-          longitude: prev.longitude + 0.0005,
-        };
-
-        mapRef.current?.animateToRegion({
-          ...newLocation,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
-
-        return newLocation;
+        const startLat = prev ? prev.latitude : userLocation.latitude + 0.02;
+        const startLng = prev ? prev.longitude : userLocation.longitude + 0.02;
+        return { latitude: startLat - 0.0004, longitude: startLng - 0.0004 };
       });
     }, 3000);
-
     return () => clearInterval(interval);
   }, [userLocation, activeBus]);
 
   const getLocation = async () => {
-    try {
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert("Permission required", "Enable location permission");
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation(loc.coords);
-    } catch (error) {
-      Alert.alert("Error", "Unable to get location");
-    }
-  };
-
-  const handleBusSearch = () => {
-    if (!busNumber) {
-      Alert.alert("Enter Bus Number");
-      return;
-    }
-
-    setActiveBus(busNumber);
-    setBusLocation(null);
-    Alert.alert("Tracking Bus", `Now tracking Bus No: ${busNumber}`);
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return Alert.alert("Permission Denied");
+    let loc = await Location.getCurrentPositionAsync({});
+    setUserLocation(loc.coords);
   };
 
   const calculateDistance = () => {
-    if (!busLocation) return 0;
-
-    const dx = userLocation.latitude - busLocation.latitude;
-    const dy = userLocation.longitude - busLocation.longitude;
-
-    return (Math.sqrt(dx * dx + dy * dy) * 111).toFixed(2);
+    if (!busLocation || !userLocation) return "0.0";
+    const d = Math.sqrt(Math.pow(userLocation.latitude - busLocation.latitude, 2) + Math.pow(userLocation.longitude - busLocation.longitude, 2)) * 111;
+    return d.toFixed(1);
   };
-
-  const eta = () => {
-    const distance = calculateDistance();
-    return ((distance / 40) * 60).toFixed(0);
-  };
-
-  const getStopStatus = (stop) => {
-    if (!busLocation) return "Upcoming";
-
-    const dx = stop.latitude - busLocation.latitude;
-    const dy = stop.longitude - busLocation.longitude;
-    const distance = Math.sqrt(dx * dx + dy * dy) * 111;
-
-    if (distance < 0.1) return "Arrived";
-    if (distance < 0.5) return "Arriving";
-    return "Upcoming";
-  };
-
-  const getNextStop = () => {
-    if (!busLocation) return "Calculating...";
-
-    let closest = null;
-    let minDistance = Infinity;
-
-    stops.forEach((stop) => {
-      const dx = stop.latitude - busLocation.latitude;
-      const dy = stop.longitude - busLocation.longitude;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closest = stop.name;
-      }
-    });
-
-    return closest;
-  };
-
-  if (!userLocation) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#1E88FF" />
-      </View>
-    );
-  }
 
   return (
-    <View style={{ flex: 1 }}>
-
-      {/* Bus Search Box */}
-      <View style={styles.searchBox}>
-        <TextInput
-          placeholder="Enter Bus Number"
-          placeholderTextColor="#999"
-          value={busNumber}
-          onChangeText={setBusNumber}
-          style={styles.input}
-        />
-        <TouchableOpacity style={styles.searchBtn} onPress={handleBusSearch}>
-          <Text style={{ color: "#fff" }}>Track</Text>
-        </TouchableOpacity>
+    <View style={styles.container}>
+      {/* Floating Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="bus" size={20} color="#1E88FF" style={{ marginRight: 10 }} />
+          <TextInput
+            placeholder="Search Bus Number (e.g. 24B)"
+            placeholderTextColor="#888"
+            style={styles.input}
+            value={busNumber}
+            onChangeText={setBusNumber}
+          />
+          <TouchableOpacity onPress={() => { setActiveBus(busNumber); Alert.alert("Live Tracking Started"); }}>
+            <Ionicons name="search-circle" size={35} color="#1E88FF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <MapView
         ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        customMapStyle={mapStyle}
         style={styles.map}
-        showsUserLocation
         initialRegion={{
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitude: 28.4595,
+          longitude: 77.0266,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
         }}
       >
-        {/* User Marker */}
-        <Marker coordinate={userLocation} title="You" pinColor="blue" />
-
-        {/* Bus Marker */}
-        {busLocation && (
-          <Marker
-            coordinate={busLocation}
-            title={activeBus ? `Bus ${activeBus}` : "Live Bus"}
-            description="Smart Express"
-            pinColor="red"
-          />
+        {userLocation && (
+          <Marker coordinate={userLocation} title="You">
+            <View style={styles.userMarkerOuter}>
+              <View style={styles.userMarkerInner} />
+            </View>
+          </Marker>
         )}
 
-        {/* Stops */}
-        {stops.map((stop) => (
-          <Marker
-            key={stop.id}
-            coordinate={{
-              latitude: stop.latitude,
-              longitude: stop.longitude,
-            }}
-            title={stop.name}
-            description={getStopStatus(stop)}
-            pinColor={
-              getStopStatus(stop) === "Arrived"
-                ? "green"
-                : getStopStatus(stop) === "Arriving"
-                ? "orange"
-                : "purple"
-            }
-          />
+        {busLocation && (
+          <>
+            <Marker coordinate={busLocation} flat rotation={45}>
+              <View style={styles.busMarker}>
+                <Ionicons name="bus" size={24} color="#fff" />
+              </View>
+            </Marker>
+            <Polyline
+              coordinates={[userLocation, busLocation]}
+              strokeColor="#1E88FF"
+              strokeWidth={3}
+              lineDashPattern={[5, 5]}
+            />
+          </>
+        )}
+
+        {stops.map(stop => (
+          <Marker key={stop.id} coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}>
+            <Ionicons name="location" size={22} color="#A855F7" />
+          </Marker>
         ))}
-
-        {/* Route Line */}
-        {busLocation && (
-          <Polyline
-            coordinates={[userLocation, busLocation]}
-            strokeWidth={4}
-            strokeColor="#1E88FF"
-          />
-        )}
       </MapView>
 
-      {/* Info Panel */}
-      {busLocation && (
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            Bus: {activeBus}
-          </Text>
-          <Text style={styles.infoText}>
-            Distance: {calculateDistance()} km
-          </Text>
-          <Text style={styles.infoText}>
-            ETA: {eta()} mins
-          </Text>
-          <Text style={styles.infoText}>
-            Next Stop: {getNextStop()}
-          </Text>
-          <Text style={styles.infoText}>
-            Status: On Time ✅
-          </Text>
+      {/* Floating Action Buttons */}
+      <View style={styles.fabContainer}>
+        <TouchableOpacity style={styles.fab} onPress={() => mapRef.current?.animateToRegion({ ...userLocation, latitudeDelta: 0.02, longitudeDelta: 0.02 })}>
+          <Ionicons name="locate" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Bottom Info Sheet */}
+      {activeBus && (
+        <View style={styles.bottomSheet}>
+          <LinearGradient colors={["#111C2F", "#050B1A"]} style={styles.sheetGradient}>
+            <View style={styles.dragHandle} />
+            
+            <View style={styles.row}>
+              <View>
+                <Text style={styles.busTitle}>Bus No: {activeBus}</Text>
+                <Text style={styles.busStatus}>Express Line • On Time</Text>
+              </View>
+              <View style={styles.etaBox}>
+                <Text style={styles.etaText}>{(calculateDistance() * 2.5).toFixed(0)} min</Text>
+              </View>
+            </View>
+
+            <View style={styles.statsRow}>
+              <View style={styles.stat}>
+                <Ionicons name="navigate-outline" size={18} color="#1E88FF" />
+                <Text style={styles.statLabel}>{calculateDistance()} km away</Text>
+              </View>
+              <View style={styles.stat}>
+                <Ionicons name="people-outline" size={18} color="#10B981" />
+                <Text style={styles.statLabel}>65% Full</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.actionButton} onPress={() => mapRef.current?.animateToRegion({ ...busLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 })}>
+              <Text style={styles.actionButtonText}>Focus on Bus</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       )}
-
-      {/* My Location Button */}
-      <TouchableOpacity
-        style={styles.zoomBtn}
-        onPress={() =>
-          mapRef.current?.animateToRegion({
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          })
-        }
-      >
-        <Text style={{ color: "#fff" }}>My Location</Text>
-      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  map: {
-    flex: 1,
+  container: { flex: 1, backgroundColor: "#050B1A" },
+  map: { width: width, height: height },
+  
+  // Search Bar
+  searchContainer: { position: 'absolute', top: 50, width: '100%', paddingHorizontal: 20, zIndex: 5 },
+  searchBar: { 
+    backgroundColor: '#111C2F', 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 15, 
+    height: 55, 
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    elevation: 10
   },
-  loader: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  searchBox: {
-    position: "absolute",
-    top: 50,
-    left: 20,
-    right: 20,
-    flexDirection: "row",
-    zIndex: 10,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 10,
-  },
-  searchBtn: {
-    marginLeft: 10,
-    backgroundColor: "#1E88FF",
-    paddingHorizontal: 15,
-    justifyContent: "center",
-    borderRadius: 10,
-  },
-  infoBox: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: "#111C2F",
-    padding: 15,
-    borderRadius: 12,
-  },
-  infoText: {
-    color: "#fff",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  zoomBtn: {
-    position: "absolute",
-    bottom: 130,
-    right: 20,
-    backgroundColor: "#1E88FF",
-    padding: 10,
-    borderRadius: 10,
-  },
+  input: { flex: 1, color: '#fff', fontSize: 16 },
+
+  // Markers
+  userMarkerOuter: { width: 30, height: 30, backgroundColor: 'rgba(30, 136, 255, 0.3)', borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+  userMarkerInner: { width: 12, height: 12, backgroundColor: '#1E88FF', borderRadius: 6, borderWidth: 2, borderColor: '#fff' },
+  busMarker: { backgroundColor: '#1E88FF', padding: 8, borderRadius: 10, borderWidth: 2, borderColor: '#fff' },
+
+  // Floating Buttons
+  fabContainer: { position: 'absolute', right: 20, bottom: height * 0.35 },
+  fab: { backgroundColor: '#1E88FF', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 5 },
+
+  // Bottom Sheet
+  bottomSheet: { position: 'absolute', bottom: 0, width: '100%', borderTopLeftRadius: 25, borderTopRightRadius: 25, overflow: 'hidden' },
+  sheetGradient: { padding: 20, paddingTop: 10 },
+  dragHandle: { width: 40, height: 5, backgroundColor: '#2A3547', borderRadius: 3, alignSelf: 'center', marginBottom: 15 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  busTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
+  busStatus: { color: '#10B981', fontSize: 14 },
+  etaBox: { backgroundColor: '#1E88FF', padding: 10, borderRadius: 12 },
+  etaText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  
+  statsRow: { flexDirection: 'row', gap: 20, marginBottom: 20 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statLabel: { color: '#aaa', fontSize: 13 },
+
+  actionButton: { backgroundColor: '#1E293B', padding: 15, borderRadius: 15, alignItems: 'center', borderWidth: 1, borderColor: '#2A3547' },
+  actionButtonText: { color: '#fff', fontWeight: 'bold' }
 });

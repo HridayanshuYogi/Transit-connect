@@ -7,804 +7,312 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  Dimensions,
 } from "react-native";
-
 import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import io from "socket.io-client";
 
 const socket = io("http://10.0.2.2:5002");
+const { width } = Dimensions.get("window");
 
 export default function BookScreen() {
-
   const [buses, setBuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeat, setSelectedSeat] = useState(null);
-  const [reservationTime, setReservationTime] = useState(null);
-  const [timer, setTimer] = useState(0);
-  const [seatType, setSeatType] = useState("Window");
   const [filteredBuses, setFilteredBuses] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [bookedSeats, setBookedSeats] = useState([]);
-  const [eta, setEta] = useState(null);
-
-  const TOTAL_SEATS = 12;
-
-  const generateSeats = () =>
-    Array.from({ length: TOTAL_SEATS }, (_, i) => `A${i + 1}`);
+  
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeBus, setActiveBus] = useState(null);
 
   useEffect(() => {
     fetchBuses();
   }, []);
 
-  // 🔥 LIVE SEAT UPDATE
   useEffect(() => {
-
     socket.on("seatUpdated", (data) => {
-
-      if (filteredBuses.length === 0) return;
-
-      if (data.busName === filteredBuses[0]?.busName) {
-
-        setBookedSeats((prev) => {
-
-          if (prev.includes(data.seatNumber)) return prev;
-
-          return [...prev, data.seatNumber];
-        });
+      if (activeBus && data.busName === activeBus.busName) {
+        setBookedSeats((prev) => 
+          prev.includes(data.seatNumber) ? prev : [...prev, data.seatNumber]
+        );
       }
-
     });
-
-    return () => {
-      socket.off("seatUpdated");
-    };
-
-  }, [filteredBuses]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (from && to) {
-        handleSearch();
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [from, to]);
-
-  // 🔥 Reservation timer
-  useEffect(() => {
-
-    if (!reservationTime) return;
-
-    const interval = setInterval(() => {
-
-      const remaining = Math.floor(
-        (reservationTime - Date.now()) / 1000
-      );
-
-      if (remaining <= 0) {
-        setSelectedSeat(null);
-        setReservationTime(null);
-        setTimer(0);
-        clearInterval(interval);
-        Alert.alert("Reservation Expired ⏳");
-      } else {
-        setTimer(remaining);
-      }
-
-    }, 1000);
-
-    return () => clearInterval(interval);
-
-  }, [reservationTime]);
+    return () => socket.off("seatUpdated");
+  }, [activeBus]);
 
   const fetchBuses = async () => {
-
     try {
-
-      const response = await fetch(
-        "http://10.0.2.2:5002/api/buses"
-      );
-
+      const response = await fetch("http://10.0.2.2:5002/api/buses");
       const data = await response.json();
-
-      if (Array.isArray(data) && data.length > 0) {
-        setBuses(data);
-        setFilteredBuses(data);
-      } else {
-
-        const demo = [
-          {
-            _id: "1",
-            busName: "Smart Express",
-            from: "Delhi",
-            to: "Jaipur",
-            price: 450,
-            bookedSeats: ["A1", "A3"],
-          },
-        ];
-
-        setBuses(demo);
-        setFilteredBuses(demo);
-      }
-
-    } catch (error) {
-
-      console.log("FETCH ERROR:", error);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-  };
-
-  const fetchETA = async (busName) => {
-
-    try {
-
-      const res = await fetch(
-        `http://10.0.2.2:5002/api/location/eta/${busName}?lat=28.4595&lng=77.0266`
-      );
-
-      const data = await res.json();
-
-      setEta(data);
-
-    } catch (error) {
-
-      console.log("ETA error:", error);
-
-    }
-
-  };
-
-
-  const calculateFare = (basePrice) => {
-
-    let extra = 0;
-
-    if (seatType === "Window") extra = 20;
-    if (seatType === "Aisle") extra = 10;
-
-    return basePrice + extra;
+      if (Array.isArray(data)) setBuses(data);
+    } catch (e) { console.log(e); } finally { setLoading(false); }
   };
 
   const handleSearch = () => {
-
-    if (!from || !to) {
-      Alert.alert("Select From and To");
-      return;
-    }
-
-    const result = buses.filter((bus) =>
-      bus.from?.toLowerCase()===from.toLowerCase() &&
-      bus.to?.toLowerCase()===to.toLowerCase()
+    const result = buses.filter(b => 
+      b.from?.toLowerCase() === from.toLowerCase() && 
+      b.to?.toLowerCase() === to.toLowerCase()
     );
-
-    setFilteredBuses(result);
-    setSelectedSeat(null);
-
     if (result.length > 0) {
+      setActiveBus(result[0]);
       setBookedSeats(result[0].bookedSeats || []);
-      fetchETA(result[0].busName);
+      setFilteredBuses(result);
     } else {
-      setBookedSeats([]);
+      Alert.alert("No Buses Found", "Try a different route.");
     }
   };
 
+  const handleOpenPayment = (bus) => {
+    if (!selectedSeat) return Alert.alert("Wait", "Select a seat first.");
+    setActiveBus(bus);
+    setIsProcessing(false);
+    setShowPaymentModal(true);
+  };
 
-
-
-
-  
-
-  const handleBook = async (bus) => {
-
-    if (!selectedSeat) {
-      Alert.alert("Select Seat First");
-      return;
-    }
-
-    try {
-
-      const token = await AsyncStorage.getItem("token");
-
-      const response = await fetch(
-        "http://10.0.2.2:5002/api/tickets",
-        {
+  const completeBookingAfterPayment = async (method) => {
+    setIsProcessing(true);
+    setTimeout(async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        const res = await fetch("http://10.0.2.2:5002/api/tickets", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            busName: bus.busName,
-            from: bus.from,
-            to: bus.to,
+            busName: activeBus.busName,
             seatNumber: selectedSeat,
-            seatType,
-            price: calculateFare(bus.price),
-            date: new Date(),
+            price: activeBus.price,
+            paymentStatus: "Paid",
+            method
           }),
-        }
-      );
+        });
 
-      const data = await response.json();
+        if (!res.ok) throw new Error("Booking failed");
 
-      if (!response.ok) {
-        Alert.alert("Booking Failed", data.message);
-        return;
-      }
-
-      await fetch(
-        "http://10.0.2.2:5002/api/tickets/confirm-seat",
-        {
+        await fetch("http://10.0.2.2:5002/api/tickets/confirm-seat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            seatNumber: selectedSeat,
-            busName: bus.busName,
-          }),
-        }
-      );
+          body: JSON.stringify({ seatNumber: selectedSeat, busName: activeBus.busName }),
+        });
 
-      socket.emit("seatBooked", {
-        busName: bus.busName,
-        seatNumber: selectedSeat,
-      });
-
-      Alert.alert("Success 🎫", "Seat Booked!");
-
-      setBookedSeats([...bookedSeats, selectedSeat]);
-      setSelectedSeat(null);
-      setReservationTime(null);
-      setTimer(0);
-
-    } catch (error) {
-
-      console.log("BOOK ERROR:", error);
-
-      Alert.alert("Network Error", "Cannot reach server");
-
-    }
+        socket.emit("seatBooked", { busName: activeBus.busName, seatNumber: selectedSeat });
+        setBookedSeats([...bookedSeats, selectedSeat]);
+        setSelectedSeat(null);
+        setShowPaymentModal(false);
+        Alert.alert("Success ✅", "Enjoy your journey!");
+      } catch (error) {
+        Alert.alert("Error", error.message);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 2000);
   };
 
-  if (loading) {
-
+  const renderSeat = (seat) => {
+    const isBooked = bookedSeats.includes(seat);
+    const isSelected = selectedSeat === seat;
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#1E88FF" />
-      </View>
+      <TouchableOpacity
+        key={seat}
+        disabled={isBooked}
+        onPress={() => setSelectedSeat(seat)}
+        style={[
+          styles.seat, 
+          isSelected && styles.selectedSeat, 
+          isBooked && styles.bookedSeat
+        ]}
+      >
+        <MaterialCommunityIcons 
+          name={isBooked ? "car-seat-cooler" : "car-seat"} 
+          size={20} 
+          color={isBooked ? "#555" : isSelected ? "#fff" : "#1E88FF"} 
+        />
+        <Text style={[styles.seatText, isSelected && { color: "#fff" }]}>{seat}</Text>
+      </TouchableOpacity>
     );
-  }
+  };
+
+  if (loading) return (
+    <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#1E88FF" />
+    </View>
+  );
 
   return (
+    <LinearGradient colors={["#050B1A", "#000"]} style={styles.container}>
+      <Text style={styles.headerTitle}>Find Your Ride 🚌</Text>
+      
+      {/* SEARCH CARD */}
+      <View style={styles.searchCard}>
+        <View style={styles.routeContainer}>
+            <View style={styles.pickerWrapper}>
+                <Picker selectedValue={from} onValueChange={setFrom} style={styles.picker}>
+                    <Picker.Item label="Origin" value="" color="#888" />
+                    <Picker.Item label="Sohna" value="sohna" />
+                    <Picker.Item label="Gurgaon" value="gurgoan" />
+                </Picker>
+            </View>
+            <Ionicons name="swap-horizontal" size={20} color="#1E88FF" style={{marginHorizontal: 10}} />
+            <View style={styles.pickerWrapper}>
+                <Picker selectedValue={to} onValueChange={setTo} style={styles.picker}>
+                    <Picker.Item label="Destination" value="" color="#888" />
+                    <Picker.Item label="Sohna" value="sohna" />
+                    <Picker.Item label="Gurgaon" value="gurgoan" />
+                </Picker>
+            </View>
+        </View>
 
-    <View style={styles.container}>
-
-      <Text style={styles.title}>Book Bus 🚌</Text>
-
-      <Text style={styles.label}>From</Text>
-
-      <View style={styles.pickerBox}>
-        <Picker selectedValue={from} onValueChange={setFrom}>
-          <Picker.Item label="Select From" value="" />
-          <Picker.Item label="sohna" value="sohna" />
-          <Picker.Item label="gurgoan" value="gurgoan" />
-          <Picker.Item label="Jaipur" value="Jaipur" />
-        </Picker>
+        <TouchableOpacity onPress={handleSearch} style={styles.searchBtn}>
+          <LinearGradient colors={["#1E88FF", "#0052D4"]} style={styles.searchGradient}>
+            <Ionicons name="search" size={20} color="#fff" />
+            <Text style={styles.searchBtnText}>Search Buses</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
-
-      <Text style={styles.label}>To</Text>
-
-      <View style={styles.pickerBox}>
-        <Picker selectedValue={to} onValueChange={setTo}>
-          <Picker.Item label="Select To" value="" />
-          <Picker.Item label="sohna" value="sohna" />
-          <Picker.Item label="gurgoan" value="gurgoan" />
-          <Picker.Item label="Jaipur" value="Jaipur" />
-        </Picker>
-      </View>
-
-      <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-        <Text style={{ color: "#fff" }}>Search Buses</Text>
-      </TouchableOpacity>
 
       <FlatList
         data={filteredBuses}
         keyExtractor={(item) => item._id}
-        ListEmptyComponent={
-          <Text style={{ color: "#fff", textAlign: "center", marginTop: 20 }}>
-            No buses found
-          </Text>
-        }
         renderItem={({ item }) => (
-
-          <View style={styles.card}>
-
+          <View style={styles.busCard}>
             <View style={styles.busHeader}>
-
-            <Text style={styles.route}>
-              {item.from} → {item.to}
-            </Text>
-
-            {/* <Text style={styles.seats}>
-             Seats Available: {TOTAL_SEATS - bookedSeats.length}
-            </Text> */}
-
-
-            <Text style={styles.busName}>
-             {item.busName}
-            </Text>
-
-            <Text style={styles.price}>
-              Base Fare: ₹{item.price}
-            </Text>
-              </View>
-
-            
-
-             {eta && (
-              <View style={styles.etaCard}>
-
-                <Text style={styles.etaText}>
-                  Distance: {eta.distance} km
-                </Text>
-
-                <Text style={styles.etaText}>
-                  Bus arriving in {eta.eta} minutes
-                </Text>
-
-              </View>
-            )}
-
-            <Text style={{ color: "#aaa", marginTop: 5 }}>
-              Available Seats: {TOTAL_SEATS - bookedSeats.length}
-            </Text>
-
-            <Text style={styles.section}>Select Seat</Text>
-
-             <View style={styles.busLayout}>
-
-  {[
-    ["A1", "A2", "A3", "A4"],
-    ["A5", "A6", "A7", "A8"],
-    ["A9", "A10", "A11", "A12"],
-  ].map((row, rowIndex) => (
-
-    <View key={rowIndex} style={styles.busRow}>
-
-      {/* LEFT SIDE */}
-      <View style={styles.seatSide}>
-        {row.slice(0, 2).map((seat) => {
-
-          const isBooked = bookedSeats.includes(seat);
-
-          return (
-            <TouchableOpacity
-              key={seat}
-              disabled={isBooked}
-              style={[
-                styles.seat,
-                selectedSeat === seat && styles.selectedSeat,
-                isBooked && styles.bookedSeat,
-              ]}
-            //   onPress={async () => {
-
-            //     if (!from || !to) {
-            //       Alert.alert("Select Route", "Please select From and To first");
-            //       return;
-            //     }
-                
-                
-
-            //     try {
-
-            //       const response = await fetch(
-            //         "http://10.0.2.2:5002/api/tickets/reserve-seat",
-            //         {
-            //           method: "POST",
-            //           headers: {
-            //             "Content-Type": "application/json",
-            //           },
-            //           body: JSON.stringify({
-            //             busName: item.busName,
-            //             seatNumber: seat,
-            //             from: item.from,
-            //             to: item.to,
-            //           }),
-            //         }
-            //       );
-
-            //       const data = await response.json();
-
-            //       if (!response.ok) {
-            //         Alert.alert(data.message || "Seat Already Reserved");
-            //         return;
-            //       }
-
-            //       setSelectedSeat(seat);
-            //       setReservationTime(Date.now() + 5 * 60 * 1000);
-            //       setTimer(300);
-
-            //     } catch (error) {
-            //       Alert.alert("Reservation Error");
-            //     }
-
-            //   }}
-            // >
-            //   <Text style={{ color: "#fff" }}>{seat}</Text>
-            // </TouchableOpacity>
-          
-
-
-
-
-
-
-
-
-
-            onPress={() => {
-
-  // Check route first
-  if (!from || !to) {
-    Alert.alert("Select Route", "Please select From and To first");
-    return;
-  }
-
-  // Prevent selecting already booked seat
-  if (bookedSeats.includes(seat)) {
-    Alert.alert("Seat already booked");
-    return;
-  }
-
-  // Select seat locally only
-  setSelectedSeat(seat);
-
-  // Start reservation timer UI (optional)
-  setReservationTime(Date.now() + 5 * 60 * 1000);
-  setTimer(300);
-
-}}
->
-<Text style={{ color: "#fff" }}>{seat}</Text>
-</TouchableOpacity>
-
-
-
-
-
-
-
-
-
-
-          );
-
-        })}
-      </View>
-
-      {/* AISLE */}
-      <View style={styles.aisle} />
-
-      {/* RIGHT SIDE */}
-      <View style={styles.seatSide}>
-        {row.slice(2, 4).map((seat) => {
-
-          const isBooked = bookedSeats.includes(seat);
-
-          return (
-            <TouchableOpacity
-              key={seat}
-              disabled={isBooked}
-              style={[
-                styles.seat,
-                selectedSeat === seat && styles.selectedSeat,
-                isBooked && styles.bookedSeat,
-              ]}
-              onPress={async () => {
-
-                if (!from || !to) {
-                  Alert.alert("Select Route", "Please select From and To first");
-                  return;
-                }
-
-                try {
-
-                  const response = await fetch(
-                    "http://10.0.2.2:5002/api/tickets/reserve-seat",
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        busName: item.busName,
-                        seatNumber: seat,
-                        from: item.from,
-                        to: item.to,
-                      }),
-                    }
-                  );
-
-                  const data = await response.json();
-
-                  if (!response.ok) {
-                    Alert.alert(data.message || "Seat Already Reserved");
-                    return;
-                  }
-
-                  setSelectedSeat(seat);
-                  setReservationTime(Date.now() + 5 * 60 * 1000);
-                  setTimer(300);
-
-                } catch (error) {
-                  Alert.alert("Reservation Error");
-                }
-
-              }}
-            >
-              <Text style={{ color: "#fff" }}>{seat}</Text>
-            </TouchableOpacity>
-          );
-          
-
-        })}
-      </View>
-    
-    </View>
-
-  ))}
-
-</View>
-
-            {selectedSeat && (
-              <Text style={{ color: "orange", marginTop: 5 }}>
-                Seat reserved for: {Math.floor(timer / 60)}:
-                {(timer % 60).toString().padStart(2, "0")}
-              </Text>
-            )}
-
-            <Text style={styles.section}>Seat Type</Text>
-
-            <View style={styles.typeRow}>
-
-              {["Window", "Middle", "Aisle"].map((type) => (
-
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.typeButton,
-                    seatType === type && styles.selectedType,
-                  ]}
-                  onPress={() => setSeatType(type)}
-                >
-                  <Text style={{ color: "#fff" }}>{type}</Text>
-                </TouchableOpacity>
-
-              ))}
-
+                <Text style={styles.busName}>{item.busName}</Text>
+                <Text style={styles.busPrice}>₹{item.price || '150'}</Text>
             </View>
 
-            <Text style={styles.fare}>
-              Total Fare: ₹{calculateFare(item.price)}
-            </Text>
+            {/* BUS INTERIOR */}
+            <View style={styles.busInterior}>
+                <View style={styles.driverSection}>
+                    <MaterialCommunityIcons name="steering" size={28} color="#444" />
+                </View>
+              {[["A1", "A2", "A3", "A4"], ["A5", "A6", "A7", "A8"], ["A9", "A10", "A11", "A12"]].map((row, i) => (
+                <View key={i} style={styles.busRow}>
+                  <View style={styles.seatSide}>{row.slice(0, 2).map(renderSeat)}</View>
+                  <View style={styles.aisle} />
+                  <View style={styles.seatSide}>{row.slice(2, 4).map(renderSeat)}</View>
+                </View>
+              ))}
+            </View>
 
-            <TouchableOpacity
-              style={styles.bookBtn}
-              onPress={() => handleBook(item)}
-            >
-              <Text style={{ color: "#fff" }}>Confirm Booking</Text>
+            {/* LEGEND */}
+            <View style={styles.legend}>
+                <LegendItem color="#2A3547" label="Available" />
+                <LegendItem color="#1E88FF" label="Selected" />
+                <LegendItem color="#FF4444" label="Booked" />
+            </View>
+
+            <TouchableOpacity style={styles.bookBtn} onPress={() => handleOpenPayment(item)}>
+              <Text style={styles.bookBtnText}>Confirm Seat {selectedSeat}</Text>
             </TouchableOpacity>
-
           </View>
-
         )}
-        
       />
-      
 
-    </View>
-    
+      {/* PAYMENT MODAL */}
+      <Modal visible={showPaymentModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.paymentBox}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Checkout</Text>
+            
+            {isProcessing ? (
+              <View style={styles.processing}>
+                <ActivityIndicator size="large" color="#1E88FF" />
+                <Text style={styles.processingText}>Securing your seat...</Text>
+              </View>
+            ) : (
+              <View style={{ width: "100%" }}>
+                <PaymentOption 
+                    title="UPI / GPay" 
+                    icon="flash" 
+                    color="#2ecc71" 
+                    onPress={() => completeBookingAfterPayment("UPI")} 
+                />
+                <PaymentOption 
+                    title="Credit/Debit Card" 
+                    icon="card" 
+                    color="#1E88FF" 
+                    onPress={() => completeBookingAfterPayment("Card")} 
+                />
+                <TouchableOpacity onPress={() => setShowPaymentModal(false)} style={styles.cancelBtn}>
+                  <Text style={{ color: "#FF4444", fontWeight: "bold" }}>Go Back</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </LinearGradient>
   );
 }
 
+// Sub-components
+const LegendItem = ({ color, label }) => (
+    <View style={{flexDirection: 'row', alignItems: 'center', marginRight: 15}}>
+        <View style={[styles.legendDot, {backgroundColor: color}]} />
+        <Text style={styles.legendText}>{label}</Text>
+    </View>
+);
+
+const PaymentOption = ({ title, icon, color, onPress }) => (
+    <TouchableOpacity style={styles.payOption} onPress={onPress}>
+        <View style={[styles.payIconBox, {backgroundColor: color + '20'}]}>
+            <Ionicons name={icon} size={22} color={color} />
+        </View>
+        <Text style={styles.payOptionText}>{title}</Text>
+        <Ionicons name="chevron-forward" size={18} color="#555" />
+    </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 60 },
+  loader: { flex:1, backgroundColor: '#050B1A', justifyContent: 'center', alignItems: 'center'},
+  headerTitle: { color: "#fff", fontSize: 26, fontWeight: "bold", marginBottom: 20 },
+  
+  searchCard: { backgroundColor: "#111C2F", padding: 15, borderRadius: 20, marginBottom: 25, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  routeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+  pickerWrapper: { flex: 1, backgroundColor: "#050B1A", borderRadius: 12 },
+  picker: { color: "#fff", height: 50 },
+  searchBtn: { borderRadius: 12, overflow: 'hidden' },
+  searchGradient: { flexDirection: 'row', padding: 15, justifyContent: 'center', alignItems: 'center' },
+  searchBtnText: { color: "#fff", fontWeight: "bold", marginLeft: 8 },
 
-  container: {
-    flex: 1,
-    backgroundColor: "#050B1A",
-    padding: 20,
-    paddingTop: 50,
-  },
+  busCard: { backgroundColor: "#111C2F", padding: 20, borderRadius: 25, marginBottom: 25 },
+  busHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  busName: { color: "#fff", fontSize: 20, fontWeight: "bold" },
+  busPrice: { color: "#2ecc71", fontSize: 18, fontWeight: "bold" },
+  
+  busInterior: { backgroundColor: "#050B1A", padding: 20, borderRadius: 20, borderTopLeftRadius: 50, borderTopRightRadius: 50 },
+  driverSection: { width: '100%', alignItems: 'flex-end', marginBottom: 15, paddingRight: 10 },
+  busRow: { flexDirection: "row", marginBottom: 12, justifyContent: 'center' },
+  seatSide: { flexDirection: "row" },
+  aisle: { width: 35 },
+  seat: { backgroundColor: "#111C2F", width: 48, height: 55, borderRadius: 10, margin: 4, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(30,136,255,0.2)" },
+  selectedSeat: { backgroundColor: "#1E88FF", borderColor: "#fff" },
+  bookedSeat: { backgroundColor: "#1a1a1a", borderColor: "transparent", opacity: 0.5 },
+  seatText: { color: "#556789", fontSize: 10, marginTop: 2, fontWeight: 'bold' },
 
-  loader: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#050B1A",
-  },
+  legend: { flexDirection: 'row', justifyContent: 'center', marginVertical: 20 },
+  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 5 },
+  legendText: { color: "#556789", fontSize: 11 },
 
-  title: {
-    color: "#fff",
-    fontSize: 22,
-    marginBottom: 15,
-  },
+  bookBtn: { backgroundColor: "#1E88FF", padding: 18, borderRadius: 15, alignItems: "center" },
+  bookBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 
-  label: {
-    color: "#aaa",
-    marginBottom: 5,
-  },
-
-  pickerBox: {
-    backgroundColor: "#111C2F",
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-
-  searchBtn: {
-    backgroundColor: "#1E88FF",
-    padding: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  card: {
-    backgroundColor: "#111C2F",
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-
-  route: {
-    color: "#fff",
-    fontSize: 16,
-  },
-
-  price: {
-    color: "#1E88FF",
-    marginVertical: 5,
-  },
-  etaCard: {
-    backgroundColor: "#111C2F",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-
-  etaText: {
-    color: "#1E88FF",
-    fontWeight: "bold",
-  },
-
-  bookBtn: {
-    backgroundColor: "#1E88FF",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 10,
-  },
-
-  section: {
-    color: "#aaa",
-    marginTop: 10,
-  },
-
-  seatGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-
-  seat: {
-    backgroundColor: "#333",
-    padding: 10,
-    borderRadius: 8,
-    margin: 5,
-  },
-
-  selectedSeat: {
-    backgroundColor: "#1E88FF",
-  },
-
-  bookedSeat: {
-    backgroundColor: "red",
-    opacity: 0.6,
-  },
-
-  typeRow: {
-    flexDirection: "row",
-    marginTop: 8,
-  },
-
-  typeButton: {
-    backgroundColor: "#333",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
-  },
-
-  selectedType: {
-    backgroundColor: "#1E88FF",
-  },
-
-  fare: {
-    color: "#fff",
-    marginTop: 10,
-    fontWeight: "bold",
-  },
-
-  bookBtn: {
-    backgroundColor: "#1E88FF",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  busLayout: {
-  marginTop: 10,
-},
-
-busRow: {
-  flexDirection: "row",
-  justifyContent: "center",
-  alignItems: "center",
-  marginBottom: 10,
-},
-
-seatSide: {
-  flexDirection: "row",
-},
-
-aisle: {
-  width: 40,
-},
-
-seat: {
-  backgroundColor: "#333",
-  padding: 12,
-  borderRadius: 8,
-  margin: 5,
-  width: 45,
-  alignItems: "center",
-},
-
-selectedSeat: {
-  backgroundColor: "#1E88FF",
-},
-
-bookedSeat: {
-  backgroundColor: "red",
-  opacity: 0.6,
-},
-busHeader: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-},
-
-busName: {
-  color: "#fff",
-  fontSize: 18,
-  fontWeight: "bold",
-},
-
-seats: {
-  color: "#2ecc71",
-  marginTop: 5,
-  fontWeight: "bold",
-},
-
-selectBtn: {
-  backgroundColor: "#1E88FF",
-  padding: 10,
-  borderRadius: 8,
-  marginTop: 10,
-  alignItems: "center",
-},
-
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.8)", justifyContent: "flex-end" },
+  paymentBox: { backgroundColor: "#111C2F", padding: 25, borderTopLeftRadius: 30, borderTopRightRadius: 30, alignItems: "center" },
+  modalHandle: { width: 40, height: 5, backgroundColor: "#2A3547", borderRadius: 10, marginBottom: 20 },
+  modalTitle: { color: "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 25 },
+  payOption: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#050B1A', padding: 15, borderRadius: 15, marginBottom: 12 },
+  payIconBox: { width: 45, height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  payOptionText: { color: '#fff', flex: 1, fontSize: 16, fontWeight: '600' },
+  cancelBtn: { marginTop: 10, padding: 15 },
+  processing: { padding: 40, alignItems: 'center' },
+  processingText: { color: "#556789", marginTop: 15 }
 });
