@@ -3,39 +3,77 @@ const app = express();
 
 const dotenv = require("dotenv");
 const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 
+// ROUTES
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const busRoutes = require("./routes/busRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const ticketRoutes = require("./routes/ticketRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+
 const Ticket = require("./models/Ticket");
 
-const http = require("http");
-const { Server } = require("socket.io");
-
-process.env.DOTENV_CONFIG_SILENT = 'true';
+// =======================================================
+// 🔥 ENV CONFIG (TOP)
+// =======================================================
+process.env.DOTENV_CONFIG_SILENT = "true";
 dotenv.config();
 
-// Connect Database
+// =======================================================
+// 🔥 DATABASE
+// =======================================================
 connectDB();
 
-// Middleware
-app.use(cors());
+// =======================================================
+// 🔥 MIDDLEWARE
+// =======================================================
+app.use(
+  cors({
+    origin: "*", // ⚠️ change in production
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
+
 app.use(express.json());
-app.use("/api/admin", adminRoutes);
 
 // Debug Logger
 app.use((req, res, next) => {
-  console.log("REQUEST:", req.method, req.url);
+  console.log(`📡 ${req.method} ${req.url}`);
   next();
 });
 
 // =======================================================
-// 🔥 CREATE HTTP SERVER FIRST
+// 🔥 ROUTES
+// =======================================================
+
+// Admin first (priority)
+app.use("/api/admin", adminRoutes);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/buses", busRoutes);
+app.use("/api/location", locationRoutes);
+app.use("/api/tickets", ticketRoutes);
+
+// =======================================================
+// 🔥 TEST ROUTE
+// =======================================================
+app.post("/test", (req, res) => {
+  console.log("✅ TEST ROUTE HIT:", req.body);
+  res.json({ message: "POST working", body: req.body });
+});
+
+app.get("/", (req, res) => {
+  res.send("🚍 SmartBusTracker Backend Running");
+});
+
+// =======================================================
+// 🔥 CREATE HTTP SERVER
 // =======================================================
 const server = http.createServer(app);
 
@@ -48,46 +86,34 @@ const io = new Server(server, {
   },
 });
 
-// Make io accessible in routes/controllers if needed
 app.set("io", io);
 
 io.on("connection", (socket) => {
-  console.log("🔌 Client connected");
+  console.log("🔌 Client connected:", socket.id);
 
+  // Seat booking event
   socket.on("seatBooked", (data) => {
+    console.log("🎟️ Seat booked:", data);
     io.emit("seatUpdated", data);
   });
 
-  socket.on("disconnect", () => {
-    console.log("❌ Client disconnected");
+  // Optional: live bus tracking event
+  socket.on("busLocationUpdate", (data) => {
+    io.emit("busLocationUpdated", data);
   });
-});
 
-// =======================================================
-// 🔥 ROUTES
-// =======================================================
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/buses", busRoutes);
-app.use("/api/location", locationRoutes);
-app.use("/api/tickets", ticketRoutes);
-
-// Test Route
-app.post("/test", (req, res) => {
-  console.log("TEST ROUTE HIT ✅", req.body);
-  res.json({ message: "POST working", body: req.body });
-});
-
-app.get("/", (req, res) => {
-  res.send("SmartBusTracker Backend Running 🚍");
+  socket.on("disconnect", () => {
+    console.log("❌ Client disconnected:", socket.id);
+  });
 });
 
 // =======================================================
 // 🔥 AUTO CLEANUP EXPIRED RESERVED SEATS
-// (Only works if your schema contains these fields)
 // =======================================================
 setInterval(async () => {
   try {
+    if (!Ticket) return;
+
     const result = await Ticket.deleteMany({
       status: "reserved",
       reservedUntil: { $lt: new Date() },
@@ -97,14 +123,26 @@ setInterval(async () => {
       console.log(`🧹 Cleaned ${result.deletedCount} expired reservations`);
     }
   } catch (error) {
-    console.log("Cleanup error:", error.message);
+    console.log("⚠️ Cleanup error:", error.message);
   }
 }, 60000);
-// =======================================================
 
+// =======================================================
+// 🔥 GLOBAL ERROR HANDLER (VERY IMPORTANT)
+// =======================================================
+app.use((err, req, res, next) => {
+  console.error("🔥 Server Error:", err.stack);
+  res.status(500).json({
+    message: "Server Error",
+    error: err.message,
+  });
+});
+
+// =======================================================
+// 🔥 START SERVER
+// =======================================================
 const PORT = process.env.PORT || 5002;
 
-// IMPORTANT: use server.listen (not app.listen)
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

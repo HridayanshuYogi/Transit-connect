@@ -4,44 +4,56 @@ const router = express.Router();
 const {
   addBus,
   getAllBuses,
+  getBusById,
   assignDriver,
   updateLocation,
   getETA,
   getStopETAs,
-  getLiveLocation,
   getLiveBuses,
   updateBusStatus,
-  updatePassengerLoad
+  updatePassengerLoad,
 } = require("../controllers/busController");
 
 const { protect, authorize } = require("../middleware/authMiddleware");
 
 
-// Admin → Add Bus
+// ================= ADMIN ROUTES =================
+
+// ➕ Add Bus
 router.post("/", protect, authorize("admin"), addBus);
 
+// 👨‍✈️ Assign Driver
+router.put("/:id/assign-driver", protect, authorize("admin"), assignDriver);
 
-// Admin → Assign Driver
-router.put("/assign-driver", protect, authorize("admin"), assignDriver);
+// 🔄 Update Bus Status
+router.put("/:id/status", protect, authorize("admin"), updateBusStatus);
 
 
-// Public → Get Buses
+// ================= DRIVER ROUTES =================
+
+// 📍 Update Live Location
+router.put("/:id/location", protect, authorize("driver"), updateLocation);
+
+// 👥 Update Passenger Count
+router.put("/:id/passengers", protect, authorize("driver"), updatePassengerLoad);
+
+
+// ================= PUBLIC ROUTES =================
+
+// 📋 Get All Buses
 router.get("/", getAllBuses);
-// Passenger → Get ETA
-router.get("/eta", getETA);
 
-// Driver → Update Location
-router.post(
-  "/location",
-  protect,
-  authorize("driver"),
-  updateLocation
-);
+// 🔍 Get Single Bus
+router.get("/:id", getBusById);
 
-router.put("/live/:id", updateLocation);
-router.get("/live", getLiveBuses);
-router.get("/stops/:busId", getStopETAs);
+// 📍 Get Live Buses
+router.get("/live/all", getLiveBuses);
 
+// ⏱️ Get ETA of Bus
+router.get("/:id/eta", getETA);
+
+// 🛑 Get Stop-wise ETA
+router.get("/:id/stops", getStopETAs);
 
 
 module.exports = router;

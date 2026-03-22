@@ -149,7 +149,7 @@ export default function EditProfile() {
                 onValueChange={(val) => setRole(val)}
               >
                 <Picker.Item label="Passenger" value="passenger" color="#000" />
-                <Picker.Item label="Driver" value="driver" color="#000" />
+                <Picker.Item label="Admin" value="admin" color="#000" />
                 <Picker.Item label="Conductor" value="conductor" color="#000" />
               </Picker>
             </View>

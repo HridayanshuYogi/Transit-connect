@@ -2,7 +2,6 @@ const Bus = require("../models/Bus");
 const User = require("../models/User");
 const { getDistance } = require("../utils/distance");
 
-
 // ================= ADD BUS =================
 exports.addBus = async (req, res) => {
   try {
@@ -32,30 +31,24 @@ exports.addBus = async (req, res) => {
       message: "Bus added successfully",
       bus,
     });
-
   } catch (error) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
-
 
 // ================= GET ALL BUSES =================
 exports.getAllBuses = async (req, res) => {
   try {
-    const buses = await Bus.find()
-      .populate("driver", "name phone role");
-
+    const buses = await Bus.find().populate("driver", "name phone role");
     res.json(buses);
-
   } catch (error) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
-
 
 // ================= ASSIGN DRIVER =================
 exports.assignDriver = async (req, res) => {
@@ -89,14 +82,12 @@ exports.assignDriver = async (req, res) => {
       message: "Driver assigned successfully",
       bus,
     });
-
   } catch (error) {
     res.status(500).json({
       message: error.message,
     });
   }
 };
-
 
 // ============ UPDATE BUS LOCATION ============
 exports.updateLocation = async (req, res) => {
@@ -122,17 +113,9 @@ exports.updateLocation = async (req, res) => {
       updatedAt: new Date(),
     };
 
-    if (speed !== undefined) {
-      bus.speed = speed;
-    }
-
-    if (passengerCount !== undefined) {
-      bus.passengerCount = passengerCount;
-    }
-
-    if (status) {
-      bus.status = status;
-    }
+    if (speed !== undefined) bus.speed = speed;
+    if (passengerCount !== undefined) bus.passengerCount = passengerCount;
+    if (status) bus.status = status;
 
     await bus.save();
 
@@ -140,14 +123,12 @@ exports.updateLocation = async (req, res) => {
       message: "Location updated ✅",
       bus,
     });
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
     });
   }
 };
-
 
 // ============ GET ETA ============
 exports.getETA = async (req, res) => {
@@ -184,7 +165,6 @@ exports.getETA = async (req, res) => {
       distance: distance.toFixed(2) + " km",
       eta: etaMinutes + " minutes",
     });
-
   } catch (error) {
     console.log("ETA ERROR ", error);
     res.status(500).json({
@@ -219,7 +199,6 @@ exports.getStopETAs = async (req, res) => {
       const etaMinutes = Math.round((distance / 40) * 60);
 
       let status = "Upcoming";
-
       if (distance < 0.2) status = "Arriving";
       if (distance < 0.05) status = "Arrived";
 
@@ -232,14 +211,12 @@ exports.getStopETAs = async (req, res) => {
     });
 
     res.json(results);
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
     });
   }
 };
-
 
 // ============ GET LIVE LOCATION ============
 exports.getLiveLocation = async (req, res) => {
@@ -261,7 +238,6 @@ exports.getLiveLocation = async (req, res) => {
       speed: bus.speed || 0,
       passengerCount: bus.passengerCount || 0,
     });
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
@@ -269,12 +245,10 @@ exports.getLiveLocation = async (req, res) => {
   }
 };
 
-
 // ============ GET ALL LIVE BUSES ============
 exports.getLiveBuses = async (req, res) => {
   try {
-    const buses = await Bus.find()
-      .populate("driver", "name phone role");
+    const buses = await Bus.find().populate("driver", "name phone role");
 
     const liveData = buses.map((bus) => ({
       busId: bus._id,
@@ -289,14 +263,12 @@ exports.getLiveBuses = async (req, res) => {
     }));
 
     res.json(liveData);
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
     });
   }
 };
-
 
 // ============ UPDATE BUS STATUS ============
 exports.updateBusStatus = async (req, res) => {
@@ -323,14 +295,12 @@ exports.updateBusStatus = async (req, res) => {
       message: "Bus status updated successfully",
       status: bus.status,
     });
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
     });
   }
 };
-
 
 // ============ UPDATE PASSENGER LOAD ============
 exports.updatePassengerLoad = async (req, res) => {
@@ -357,10 +327,35 @@ exports.updatePassengerLoad = async (req, res) => {
       message: "Passenger load updated successfully",
       passengerCount: bus.passengerCount,
     });
-
   } catch (error) {
     res.status(500).json({
       message: "Server Error",
     });
+  }
+};
+
+// ============ SEARCH BUSES ============
+exports.searchBuses = async (req, res) => {
+  const { q } = req.query;
+  try {
+    const buses = await Bus.find({
+      routeTo: { $regex: q, $options: "i" },
+    });
+    res.json(buses);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ============ GET SINGLE BUS ============
+exports.getBusById = async (req, res) => {
+  try {
+    const bus = await Bus.findById(req.params.id);
+    if (!bus) {
+      return res.status(404).json({ message: "Bus not found" });
+    }
+    res.json(bus);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
