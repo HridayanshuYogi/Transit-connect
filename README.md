@@ -14,4 +14,5 @@
 🚗 Preference for Private Vehicles :- Due to unreliable bus schedules and lack of information, many people prefer using private vehicles, which increases traffic congestion and pollution.
 
 ⭐ Conclusion : 
+
 The above challenges show the need for a smart bus tracking and scheduling system (Transit-connect 🚍) that can provide real-time bus location, accurate arrival times, and instant updates to passengers, improving the overall public transportation experience.
