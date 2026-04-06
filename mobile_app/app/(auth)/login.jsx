@@ -22,7 +22,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const BASE_URL = "http://192.168.1.34:5002"; // ✅ your laptop IP
+  // const BASE_URL = "http://192.168.1.34:5002"; // ✅ your laptop IP
+  const BASE_URL = "https://smartbustracker.onrender.com";
 
 const handleLogin = async () => {
   if (!phone || !password) {
