@@ -1,124 +1,209 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, FlatList, Modal, ActivityIndicator } from "react-native";
+import { 
+  View, Text, StyleSheet, TouchableOpacity, Alert, 
+  FlatList, Modal, ActivityIndicator, ScrollView 
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import QRCode from 'react-native-qrcode-svg';
+
+// --- CONFIGURATION ---
+const STOPS = ["Sohna", "Badshahpur", "Subhash Chowk", "Rajiv Chowk", "IFFCO Chowk", "Gurgaon"];
+const BASE_FARE = 10; 
+const PRICE_PER_STOP = 10; 
+const TOTAL_SEATS = 12;
+const BACKEND_URL = "http://192.168.1.15:5002"; // ⚠️ REPLACE WITH YOUR LOCAL IP
 
 export default function ConductorScreen() {
-  const [scanned, setScanned] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [showStopPicker, setShowStopPicker] = useState({ visible: false, type: "" });
   const [showPassengerList, setShowPassengerList] = useState(false);
+  
   const [passengers, setPassengers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
+  
+  const [source, setSource] = useState(STOPS[0]); 
+  const [destination, setDestination] = useState(STOPS[1]);
+  const [fare, setFare] = useState(20);
 
-  // --- Feature 1: QR Verification ---
-  const handleBarCodeScanned = async ({ data }) => {
-    setScanned(true);
-    setShowScanner(false);
-    
+  const busDetails = { busId: "BUS_123_XYZ", busName: "SmartExpress 502" };
+
+  // --- 1. FETCH PASSENGERS ON LOAD ---
+  useEffect(() => {
+    loadPassengerData();
+  }, []);
+
+  const loadPassengerData = async () => {
     try {
-      // Assuming QR data is a JSON string containing ticketId
-      const ticketData = JSON.parse(data);
-      const response = await fetch(`http://10.0.2.2:5002/api/tickets/verify/${ticketData.ticketId}`);
-      const result = await response.json();
-
-      if (result.valid) {
-        Alert.alert("Verified ✅", `Passenger: ${result.passengerName}\nSeat: ${result.seatNumber}`);
-      } else {
-        Alert.alert("Invalid ❌", "This ticket is not valid or already used.");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Invalid QR Code Format");
-    }
-    setScanned(false);
-  };
-
-  // --- Feature 2: Fetch Passenger List ---
-  const fetchPassengers = async () => {
-    setLoading(true);
-    setShowPassengerList(true);
-    try {
-      // You can filter this by the specific bus assigned to the conductor
-      const response = await fetch(`http://10.0.2.2:5002/api/tickets`); 
+      const response = await fetch(`${BACKEND_URL}/api/tickets`);
       const data = await response.json();
       setPassengers(data);
-    } catch (error) {
-      Alert.alert("Error", "Could not fetch passenger list");
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.log("Fetch Error:", e.message);
     }
   };
 
-  // Permission UI
-  if (!permission) return <View />;
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={{ color: '#fff', textAlign: 'center' }}>We need camera permission to scan tickets</Text>
-        <TouchableOpacity style={styles.card} onPress={requestPermission}>
-          <Text style={styles.cardText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // --- 2. FARE CALCULATION ---
+  useEffect(() => {
+    const start = STOPS.indexOf(source);
+    const end = STOPS.indexOf(destination);
+    if (start !== -1 && end !== -1 && end > start) {
+      setFare(BASE_FARE + ((end - start) * PRICE_PER_STOP));
+    } else {
+      setFare(0);
+    }
+  }, [source, destination]);
+
+  // --- 3. RANDOM SEAT ALLOCATION LOGIC ---
+  const allocateRandomSeat = () => {
+    const allSeats = Array.from({ length: TOTAL_SEATS }, (_, i) => i + 1);
+    const takenSeats = passengers.map(p => p.seatNumber);
+    const availableSeats = allSeats.filter(seat => !takenSeats.includes(seat));
+
+    if (availableSeats.length === 0) return null;
+
+    // Pick a random index from available seats
+    const randomIndex = Math.floor(Math.random() * availableSeats.length);
+    return availableSeats[randomIndex];
+  };
+
+  // --- 4. OFFLINE BOOKING HANDLER ---
+  const handleOfflineBooking = async () => {
+    if (fare <= 0) {
+      Alert.alert("Invalid Route", "Please select a valid destination.");
+      return;
+    }
+
+    const assignedSeat = allocateRandomSeat();
+    if (!assignedSeat) {
+      Alert.alert("Bus Full", "No seats available.");
+      return;
+    }
+
+    Alert.alert("Confirm Cash Booking", `Collect ₹${fare}\nAssigned Seat: ${assignedSeat}`, [
+      { text: "Cancel" },
+      { text: "Confirm", onPress: async () => {
+          try {
+            const response = await fetch(`${BACKEND_URL}/api/tickets/offline`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                busId: busDetails.busId,
+                from: source,
+                to: destination,
+                fare: fare,
+                seatNumber: assignedSeat,
+                paymentMethod: "cash",
+                status: "booked"
+              })
+            });
+
+            if (response.ok) {
+              Alert.alert("Success ✅", `Ticket Booked! Seat: ${assignedSeat}`);
+              loadPassengerData(); // Refresh list
+            }
+          } catch (e) {
+            Alert.alert("Error", "Could not connect to server.");
+          }
+      }}
+    ]);
+  };
 
   return (
     <LinearGradient colors={["#050B1A", "#000"]} style={styles.container}>
-      <Text style={styles.title}>Conductor Panel 🎫</Text>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.title}>Conductor Panel 🎫</Text>
 
-      {/* Main Dashboard Buttons */}
-      <TouchableOpacity style={styles.card} onPress={() => setShowScanner(true)}>
-        <Text style={styles.cardText}>🔍 Scan Ticket QR</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.card} onPress={fetchPassengers}>
-        <Text style={styles.cardText}>📋 View Passenger List</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.card} onPress={() => Alert.alert("Total Seats: 12", "Booked: " + passengers.length)}>
-        <Text style={styles.cardText}>💺 Check Seat Availability</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.card} onPress={() => Alert.alert("Notice", "Complaint portal opening soon")}>
-        <Text style={styles.cardText}>⚠️ Report Complaint</Text>
-      </TouchableOpacity>
-
-      {/* --- QR Scanner Modal --- */}
-      <Modal visible={showScanner} animationType="slide">
-        <CameraView
-          style={StyleSheet.absoluteFillObject}
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        >
-          <View style={styles.overlay}>
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowScanner(false)}>
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Close Scanner</Text>
+        {/* TRIP CONFIGURATION */}
+        <View style={styles.inputCard}>
+          <Text style={styles.label}>Route & Pricing</Text>
+          <View style={styles.row}>
+            <TouchableOpacity style={styles.miniSelector} onPress={() => setShowStopPicker({ visible: true, type: "source" })}>
+              <Text style={styles.selectorLabel}>FROM</Text>
+              <Text style={styles.selectorValue}>{source}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.miniSelector} onPress={() => setShowStopPicker({ visible: true, type: "destination" })}>
+              <Text style={styles.selectorLabel}>TO</Text>
+              <Text style={styles.selectorValue}>{destination}</Text>
             </TouchableOpacity>
           </View>
-        </CameraView>
+
+          <View style={styles.fareBox}>
+            <Text style={styles.fareText}>Total: <Text style={styles.price}>₹{fare}</Text></Text>
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.mainBtn, styles.onlineBtn, { opacity: fare > 0 ? 1 : 0.5 }]} 
+            onPress={() => fare > 0 && setShowQRModal(true)}
+          >
+            <Text style={styles.btnText}>📲 Show Payment QR</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.mainBtn, styles.offlineBtn, { opacity: fare > 0 ? 1 : 0.5 }]} 
+            onPress={handleOfflineBooking}
+          >
+            <Text style={styles.btnText}>💵 Cash Booking (Offline)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* MANAGEMENT BUTTONS */}
+        <View style={styles.mgmtRow}>
+            <TouchableOpacity style={styles.mgmtCard} onPress={() => { loadPassengerData(); setShowPassengerList(true); }}>
+                <Text style={styles.mgmtTitle}>📋 Passengers</Text>
+                <Text style={styles.mgmtSub}>{passengers.length} Booked</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.mgmtCard} onPress={() => Alert.alert("Capacity", `Available: ${TOTAL_SEATS - passengers.length} / ${TOTAL_SEATS}`)}>
+                <Text style={styles.mgmtTitle}>💺 Available</Text>
+                <Text style={styles.mgmtSub}>{TOTAL_SEATS - passengers.length} Seats Left</Text>
+            </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* --- MODAL: STOP PICKER --- */}
+      <Modal visible={showStopPicker.visible} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={styles.pickerBox}>
+            <FlatList data={STOPS} keyExtractor={i => i} renderItem={({item}) => (
+              <TouchableOpacity style={styles.stopItem} onPress={() => {
+                if(showStopPicker.type === 'source') setSource(item); else setDestination(item);
+                setShowStopPicker({visible: false});
+              }}><Text style={styles.stopText}>{item}</Text></TouchableOpacity>
+            )} />
+          </View>
+        </View>
       </Modal>
 
-      {/* --- Passenger List Modal --- */}
-      <Modal visible={showPassengerList} animationType="fade" transparent={true}>
-        <View style={styles.modalContent}>
+      {/* --- MODAL: QR CODE --- */}
+      <Modal visible={showQRModal} transparent animationType="slide">
+        <View style={styles.overlay}>
+          <View style={styles.qrCard}>
+            <Text style={styles.qrHeader}>Scan & Pay ₹{fare}</Text>
+            <QRCode value={JSON.stringify({busId: busDetails.busId, amount: fare, from: source, to: destination})} size={200}/>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQRModal(false)}><Text style={{color: '#fff'}}>Done</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL: PASSENGER LIST --- */}
+      <Modal visible={showPassengerList} transparent animationType="fade">
+        <View style={styles.overlay}>
           <LinearGradient colors={["#111C2F", "#050B1A"]} style={styles.listContainer}>
-            <Text style={styles.modalTitle}>Current Passengers</Text>
-            {loading ? (
-              <ActivityIndicator size="large" color="#1E88FF" />
-            ) : (
-              <FlatList
-                data={passengers}
-                keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                  <View style={styles.passengerItem}>
-                    <Text style={styles.pTextName}>{item.busName} - Seat {item.seatNumber}</Text>
-                    <Text style={styles.pTextSub}>{item.from} ➔ {item.to}</Text>
-                  </View>
-                )}
-              />
-            )}
-            <TouchableOpacity style={styles.closeBtnList} onPress={() => setShowPassengerList(false)}>
-              <Text style={{ color: "#fff" }}>Go Back</Text>
-            </TouchableOpacity>
+            <Text style={styles.modalHeader}>Live Passenger List</Text>
+            <FlatList 
+              data={passengers} 
+              keyExtractor={i => i._id} 
+              renderItem={({item}) => (
+                <View style={styles.passengerItem}>
+                   <View style={styles.seatBadge}><Text style={styles.seatText}>{item.seatNumber}</Text></View>
+                   <View>
+                      <Text style={{color: '#fff', fontWeight: 'bold'}}>{item.from} ➔ {item.to}</Text>
+                      <Text style={{color: '#888', fontSize: 11}}>{item.paymentMethod === 'cash' ? '💵 Cash' : '💳 Online'}</Text>
+                   </View>
+                </View>
+              )} 
+            />
+            <TouchableOpacity style={styles.listClose} onPress={() => setShowPassengerList(false)}><Text style={{color: '#fff'}}>Close</Text></TouchableOpacity>
           </LinearGradient>
         </View>
       </Modal>
@@ -128,21 +213,43 @@ export default function ConductorScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 25, paddingTop: 50 },
-  title: { fontSize: 26, color: "#1E88FF", fontWeight: "bold", marginBottom: 30 },
-  card: { backgroundColor: "#111C2F", padding: 20, borderRadius: 15, marginBottom: 15 },
-  cardText: { color: "#fff", fontSize: 16 },
+  container: { flex: 1, padding: 20, paddingTop: 50 },
+  title: { fontSize: 24, color: "#1E88FF", fontWeight: "bold", marginBottom: 20 },
   
-  // Scanner
-  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 50 },
-  closeBtn: { backgroundColor: "#FF4444", padding: 15, borderRadius: 10 },
+  inputCard: { backgroundColor: "#111C2F", padding: 20, borderRadius: 20, marginBottom: 15 },
+  label: { color: "#1E88FF", fontWeight: "bold", marginBottom: 15, fontSize: 14 },
+  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  miniSelector: { backgroundColor: '#050B1A', width: '48%', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#2A3547' },
+  selectorLabel: { color: '#888', fontSize: 10, marginBottom: 4 },
+  selectorValue: { color: '#fff', fontWeight: 'bold' },
 
-  // Passenger List
-  modalContent: { flex: 1, backgroundColor: "rgba(0,0,0,0.9)", justifyContent: "center", padding: 20 },
-  listContainer: { padding: 20, borderRadius: 20, flex: 0.8 },
-  modalTitle: { color: "#1E88FF", fontSize: 20, fontWeight: "bold", marginBottom: 20 },
-  passengerItem: { borderBottomWidth: 1, borderBottomColor: "#2A3547", paddingVertical: 10 },
-  pTextName: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  pTextSub: { color: "#aaa", fontSize: 12 },
-  closeBtnList: { marginTop: 20, backgroundColor: "#1E88FF", padding: 15, borderRadius: 10, alignItems: "center" },
+  fareBox: { alignItems: 'center', marginVertical: 15 },
+  fareText: { color: '#888', fontSize: 14 },
+  price: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
+
+  mainBtn: { padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 10 },
+  btnText: { color: '#fff', fontWeight: 'bold' },
+  onlineBtn: { backgroundColor: '#1E88FF' },
+  offlineBtn: { backgroundColor: '#28A745' },
+
+  mgmtRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  mgmtCard: { backgroundColor: '#111C2F', width: '48%', padding: 15, borderRadius: 15 },
+  mgmtTitle: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  mgmtSub: { color: '#1E88FF', fontSize: 12, marginTop: 4 },
+
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  pickerBox: { backgroundColor: '#111C2F', width: '80%', borderRadius: 15, padding: 10, maxHeight: '50%' },
+  stopItem: { padding: 15, borderBottomWidth: 1, borderBottomColor: '#2A3547' },
+  stopText: { color: '#fff', textAlign: 'center' },
+
+  qrCard: { backgroundColor: '#fff', padding: 30, borderRadius: 25, alignItems: 'center' },
+  qrHeader: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  closeBtn: { backgroundColor: '#FF4444', marginTop: 20, paddingVertical: 10, paddingHorizontal: 30, borderRadius: 10 },
+
+  listContainer: { width: '90%', height: '70%', borderRadius: 20, padding: 20 },
+  modalHeader: { color: '#1E88FF', fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
+  passengerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#2A3547' },
+  seatBadge: { backgroundColor: '#1E88FF', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  seatText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  listClose: { marginTop: 15, backgroundColor: '#1E88FF', padding: 12, borderRadius: 10, alignItems: 'center' }
 });
