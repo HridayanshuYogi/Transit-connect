@@ -43,13 +43,13 @@ router.put("/:id/passengers", protect, authorize("driver"), updatePassengerLoad)
 // 📋 Get All Buses
 router.get("/", getAllBuses);
 
+// 📍 IMPORTANT: put this BEFORE :id
+router.get("/live/all", getLiveBuses);
+
 // 🔍 Get Single Bus
 router.get("/:id", getBusById);
 
-// 📍 Get Live Buses
-router.get("/live/all", getLiveBuses);
-
-// ⏱️ Get ETA of Bus
+// ⏱️ Get ETA
 router.get("/:id/eta", getETA);
 
 // 🛑 Get Stop-wise ETA

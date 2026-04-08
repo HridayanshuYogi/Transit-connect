@@ -22,37 +22,41 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!phone || !password) {
-      Alert.alert("Error ❌", "Please enter both phone and password");
-      return;
+  // const BASE_URL = "http://192.168.1.34:5002"; // ✅ your laptop IP
+  const BASE_URL = "https://smartbustracker.onrender.com";
+
+const handleLogin = async () => {
+  if (!phone || !password) {
+    Alert.alert("Error ❌", "Please enter both phone and password");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const response = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone, password }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      await AsyncStorage.setItem("token", data.token);
+      router.replace("/(tabs)");
+    } else {
+      Alert.alert("Failed ❌", data.message || "Invalid credentials");
     }
-
-    try {
-      setLoading(true);
-      const API_URL = "http://10.0.2.2:5002/api/auth/login";
-
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        await AsyncStorage.setItem("token", data.token);
-        router.replace("/(tabs)");
-      } else {
-        Alert.alert("Failed ❌", data.message || "Invalid credentials");
-      }
-    } catch (error) {
-      Alert.alert("Server Error ⚠️", "Backend not reachable!");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  } catch (error) {
+    console.log(error);
+    Alert.alert("Server Error ⚠️", "Backend not reachable!");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <LinearGradient colors={["#050B1A", "#050B1A", "#000"]} style={styles.container}>
       <KeyboardAvoidingView 
