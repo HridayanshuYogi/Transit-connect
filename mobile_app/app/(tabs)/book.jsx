@@ -174,7 +174,7 @@ export default function BookScreen() {
             <Picker selectedValue={from} onValueChange={setFrom} style={styles.picker} dropdownIconColor="#fff">
               <Picker.Item label="Origin" value="" color="#888" />
               <Picker.Item label="Sohna" value="sohna" color="#000" />
-              <Picker.Item label="Gurgaon" value="gurgaon" color="#000" />
+              <Picker.Item label="Gurgoan" value="gurgoan" color="#000" />
             </Picker>
           </View>
           <Ionicons name="swap-horizontal" size={20} color="#1E88FF" style={{ marginHorizontal: 10 }} />
@@ -182,7 +182,7 @@ export default function BookScreen() {
             <Picker selectedValue={to} onValueChange={setTo} style={styles.picker} dropdownIconColor="#fff">
               <Picker.Item label="Destination" value="" color="#888" />
               <Picker.Item label="Sohna" value="sohna" color="#000" />
-              <Picker.Item label="Gurgaon" value="gurgaon" color="#000" />
+              <Picker.Item label="Gurgoan" value="gurgoan" color="#000" />
             </Picker>
           </View>
         </View>
