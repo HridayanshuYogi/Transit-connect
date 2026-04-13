@@ -1,4 +1,3 @@
-console.log("🔥 SERVER FILE RUNNING");
 const express = require("express");
 const app = express();
 
@@ -20,7 +19,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const Ticket = require("./models/Ticket");
 
 // =======================================================
-// 🔥 ENV CONFIG
+// 🔥 ENV CONFIG (TOP)
 // =======================================================
 process.env.DOTENV_CONFIG_SILENT = "true";
 dotenv.config();
@@ -35,7 +34,7 @@ connectDB();
 // =======================================================
 app.use(
   cors({
-    origin: "*",
+    origin: "*", // ⚠️ change in production
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
@@ -51,7 +50,10 @@ app.use((req, res, next) => {
 // =======================================================
 // 🔥 ROUTES
 // =======================================================
+
+// Admin first (priority)
 app.use("/api/admin", adminRoutes);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/buses", busRoutes);
@@ -59,7 +61,7 @@ app.use("/api/location", locationRoutes);
 app.use("/api/tickets", ticketRoutes);
 
 // =======================================================
-// 🔥 TEST ROUTES
+// 🔥 TEST ROUTE
 // =======================================================
 app.post("/test", (req, res) => {
   console.log("✅ TEST ROUTE HIT:", req.body);
@@ -89,11 +91,13 @@ app.set("io", io);
 io.on("connection", (socket) => {
   console.log("🔌 Client connected:", socket.id);
 
+  // Seat booking event
   socket.on("seatBooked", (data) => {
     console.log("🎟️ Seat booked:", data);
     io.emit("seatUpdated", data);
   });
 
+  // Optional: live bus tracking event
   socket.on("busLocationUpdate", (data) => {
     io.emit("busLocationUpdated", data);
   });
@@ -124,7 +128,7 @@ setInterval(async () => {
 }, 60000);
 
 // =======================================================
-// 🔥 GLOBAL ERROR HANDLER
+// 🔥 GLOBAL ERROR HANDLER (VERY IMPORTANT)
 // =======================================================
 app.use((err, req, res, next) => {
   console.error("🔥 Server Error:", err.stack);
@@ -135,11 +139,10 @@ app.use((err, req, res, next) => {
 });
 
 // =======================================================
-// 🔥 START SERVER (FIXED)
+// 🔥 START SERVER
 // =======================================================
 const PORT = process.env.PORT || 5002;
 
-// ✅ IMPORTANT: allow mobile access
-server.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
